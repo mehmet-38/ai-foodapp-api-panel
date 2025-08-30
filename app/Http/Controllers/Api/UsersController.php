@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Recipe;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -107,9 +108,11 @@ class UsersController extends Controller
     {
         $user = $request->user();
         
-        $recipes = $user->savedRecipes()
-            ->select(['recipes.id', 'recipes.name', 'recipes.description', 'recipes.ingredients', 'recipes.instructions', 'recipes.image_url', 'recipes.prep_time', 'recipes.cook_time', 'recipes.servings', 'recipes.created_at'])
-            ->get();
+        $recipes = Recipe::whereHas('savedRecipes', function($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+        ->select(['id', 'name', 'description', 'ingredients', 'instructions', 'image_url', 'prep_time', 'cook_time', 'servings', 'created_at'])
+        ->get();
 
         return response()->json([
             'recipes' => $recipes
