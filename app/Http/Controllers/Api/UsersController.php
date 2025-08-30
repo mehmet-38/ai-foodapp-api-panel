@@ -108,7 +108,7 @@ class UsersController extends Controller
         $user = $request->user();
         
         $recipes = $user->savedRecipes()
-            ->select(['id', 'name', 'description', 'ingredients', 'instructions', 'image_url', 'prep_time', 'cook_time', 'servings', 'created_at'])
+            ->select(['recipes.id', 'recipes.name', 'recipes.description', 'recipes.ingredients', 'recipes.instructions', 'recipes.image_url', 'recipes.prep_time', 'recipes.cook_time', 'recipes.servings', 'recipes.created_at'])
             ->get();
 
         return response()->json([
