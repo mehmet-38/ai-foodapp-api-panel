@@ -123,4 +123,18 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | API Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for external API endpoints and image URLs.
+    |
+    */
+
+    'api' => [
+        'base_url' => env('API_BASE_URL', 'http://localhost:8000'),
+        'images_url' => env('API_IMAGES_URL', 'http://localhost:8000/api/images'),
+    ],
+
 ];

@@ -2,15 +2,40 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\Admin\AdminController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+});
+
+// Admin Panel Routes
+Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::get('/users', [AdminController::class, 'users'])->name('users');
+    Route::get('/recipes', [AdminController::class, 'recipes'])->name('recipes');
+    Route::get('/posts', [AdminController::class, 'posts'])->name('posts');
+    
+    // Admin API endpoints
+    Route::get('/api/stats', [AdminController::class, 'getDashboardStats'])->name('api.stats');
+    
+    // User management API endpoints
+    Route::post('/api/users', [AdminController::class, 'storeUser'])->name('api.users.store');
+    Route::put('/api/users/{id}', [AdminController::class, 'updateUser'])->name('api.users.update');
+    Route::delete('/api/users/{id}', [AdminController::class, 'deleteUser'])->name('api.users.delete');
+    
+    // Recipe management API endpoints
+    Route::post('/api/recipes', [AdminController::class, 'storeRecipe'])->name('api.recipes.store');
+    Route::put('/api/recipes/{id}', [AdminController::class, 'updateRecipe'])->name('api.recipes.update');
+    Route::delete('/api/recipes/{id}', [AdminController::class, 'deleteRecipe'])->name('api.recipes.delete');
+    
+    // Posts management API endpoints
+    Route::post('/api/posts', [AdminController::class, 'storePost'])->name('api.posts.store');
+    Route::put('/api/posts/{id}', [AdminController::class, 'updatePost'])->name('api.posts.update');
+    Route::delete('/api/posts/{id}', [AdminController::class, 'deletePost'])->name('api.posts.delete');
 });
 
 require __DIR__.'/settings.php';

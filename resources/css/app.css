@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Ant Design Styles */
+@import 'antd/dist/reset.css';
+
 @plugin 'tailwindcss-animate';
 
 @source '../views';

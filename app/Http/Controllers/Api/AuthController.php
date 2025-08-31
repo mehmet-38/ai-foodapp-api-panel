@@ -36,6 +36,7 @@ class AuthController extends Controller
 
         /** @var User $user */
         $user = User::create([
+            'name' => $request->username, // name alanını username'den kopyala
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
