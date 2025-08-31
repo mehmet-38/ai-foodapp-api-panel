@@ -39,6 +39,7 @@ export interface User {
     height?: number;
     weight?: number;
     age?: number;
+    role: string;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

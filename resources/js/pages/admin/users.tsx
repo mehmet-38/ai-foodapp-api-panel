@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Input, Button, Tag, Avatar, Space, Card, Typography, Modal, Form, InputNumber, message, Popconfirm } from 'antd';
+import { Table, Input, Button, Tag, Avatar, Space, Card, Typography, Modal, Form, InputNumber, Select, message, Popconfirm } from 'antd';
 import { 
     UserOutlined, 
     SearchOutlined, 
@@ -26,6 +26,7 @@ interface User {
     height?: number;
     weight?: number;
     age?: number;
+    role: string;
     created_at: string;
     email_verified_at?: string;
 }
@@ -98,6 +99,7 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
             age: user.age,
             height: user.height,
             weight: user.weight,
+            role: user.role,
         });
         setEditModalVisible(true);
     };
@@ -229,6 +231,17 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
                 <div>
                     {record.height ? `${record.height}cm` : '-'} / {record.weight ? `${record.weight}kg` : '-'}
                 </div>
+            ),
+        },
+        {
+            title: 'Rol',
+            dataIndex: 'role',
+            key: 'role',
+            width: 100,
+            render: (role) => (
+                <Tag color={role === 'admin' ? 'red' : 'blue'}>
+                    {role === 'admin' ? 'Admin' : 'Kullanıcı'}
+                </Tag>
             ),
         },
         {
@@ -379,6 +392,13 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
                                 <Text>{selectedUser.username}</Text>
                             </div>
                             <div>
+                                <Text strong>Rol:</Text>
+                                <br />
+                                <Tag color={selectedUser.role === 'admin' ? 'red' : 'blue'}>
+                                    {selectedUser.role === 'admin' ? 'Admin' : 'Kullanıcı'}
+                                </Tag>
+                            </div>
+                            <div>
                                 <Text strong>E-mail Durumu:</Text>
                                 <br />
                                 <Tag color={selectedUser.email_verified_at ? 'green' : 'orange'}>
@@ -466,6 +486,18 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
                         ]}
                     >
                         <Input.Password placeholder="Şifre" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="role"
+                        label="Rol"
+                        rules={[{ required: true, message: 'Rol seçimi gereklidir!' }]}
+                        initialValue="user"
+                    >
+                        <Select placeholder="Rol seçiniz">
+                            <Select.Option value="user">Kullanıcı</Select.Option>
+                            <Select.Option value="admin">Admin</Select.Option>
+                        </Select>
                     </Form.Item>
 
                     <div className="grid grid-cols-3 gap-4">
@@ -563,6 +595,17 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
                         ]}
                     >
                         <Input.Password placeholder="Yeni şifre" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="role"
+                        label="Rol"
+                        rules={[{ required: true, message: 'Rol seçimi gereklidir!' }]}
+                    >
+                        <Select placeholder="Rol seçiniz">
+                            <Select.Option value="user">Kullanıcı</Select.Option>
+                            <Select.Option value="admin">Admin</Select.Option>
+                        </Select>
                     </Form.Item>
 
                     <div className="grid grid-cols-3 gap-4">

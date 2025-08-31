@@ -21,9 +21,6 @@ class AuthController extends Controller
             'username' => 'required|string|max:50|unique:users',
             'email' => 'required|string|email|max:100|unique:users',
             'password' => 'required|string|min:6',
-            'height' => 'nullable|numeric|min:0',
-            'weight' => 'nullable|numeric|min:0',
-            'age' => 'nullable|integer|min:0|max:150',
         ]);
 
         if ($validator->fails()) {
@@ -40,9 +37,7 @@ class AuthController extends Controller
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'height' => $request->height,
-            'weight' => $request->weight,
-            'age' => $request->age,
+            'role' => 'user', // Mobil uygulamadan kayıt olanlar default user rolü alır
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -53,10 +48,7 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'username' => $user->username,
-                'email' => $user->email,
-                'height' => $user->height,
-                'weight' => $user->weight,
-                'age' => $user->age,
+                'email' => $user->email
             ]
         ], 201);
     }
@@ -116,9 +108,6 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'username' => $user->username,
                 'email' => $user->email,
-                'height' => $user->height,
-                'weight' => $user->weight,
-                'age' => $user->age,
                 'created_at' => $user->created_at,
             ]
         ]);

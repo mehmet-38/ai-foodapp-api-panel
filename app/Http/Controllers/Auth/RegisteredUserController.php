@@ -41,6 +41,7 @@ class RegisteredUserController extends Controller
             'username' => $request->name, // username alanını da doldur
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => 'admin', // Web panelünden kayıt olanlar admin rolü alır
         ]);
 
         event(new Registered($user));

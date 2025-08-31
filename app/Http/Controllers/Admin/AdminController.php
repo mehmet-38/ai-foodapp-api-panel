@@ -99,7 +99,7 @@ class AdminController extends Controller
         $posts = Post::with('user')
             ->when($search, function ($query, $search) {
                 return $query->where('title', 'like', "%{$search}%")
-                            ->orWhere('content', 'like', "%{$search}%");
+                            ->orWhere('description', 'like', "%{$search}%");
             })
             ->latest()
             ->paginate($perPage);
@@ -144,6 +144,7 @@ class AdminController extends Controller
             'username' => 'required|string|max:50|unique:users',
             'email' => 'required|string|email|max:100|unique:users',
             'password' => 'required|string|min:6',
+            'role' => 'required|in:user,admin',
             'height' => 'nullable|numeric|min:0',
             'weight' => 'nullable|numeric|min:0',
             'age' => 'nullable|integer|min:0|max:150',
@@ -162,6 +163,7 @@ class AdminController extends Controller
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => $request->role,
             'height' => $request->height,
             'weight' => $request->weight,
             'age' => $request->age,
@@ -194,6 +196,7 @@ class AdminController extends Controller
             'username' => 'sometimes|string|max:50|unique:users,username,' . $id,
             'email' => 'sometimes|string|email|max:100|unique:users,email,' . $id,
             'password' => 'sometimes|string|min:6',
+            'role' => 'sometimes|in:user,admin',
             'height' => 'sometimes|nullable|numeric|min:0',
             'weight' => 'sometimes|nullable|numeric|min:0',
             'age' => 'sometimes|nullable|integer|min:0|max:150',
@@ -207,7 +210,7 @@ class AdminController extends Controller
             ], 422);
         }
 
-        $updateData = $request->only(['name', 'username', 'email', 'height', 'weight', 'age']);
+        $updateData = $request->only(['name', 'username', 'email', 'role', 'height', 'weight', 'age']);
         
         if ($request->has('password')) {
             $updateData['password'] = Hash::make($request->password);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Input, Button, Tag, Space, Card, Typography, Modal, Avatar, message, Popconfirm } from 'antd';
+import { Table, Input, Button, Tag, Space, Card, Typography, Modal, Avatar, Image, message, Popconfirm } from 'antd';
 import { 
     SearchOutlined, 
     EyeOutlined, 
@@ -22,7 +22,9 @@ const { Title, Text } = Typography;
 interface Post {
     id: number;
     title: string;
-    content: string;
+    description: string;
+    image_url?: string;
+    likes_count: number;
     created_at: string;
     user: {
         id: number;
@@ -45,6 +47,24 @@ interface PostsPageProps {
         per_page: number;
     };
 }
+
+// Helper function to construct full image URL
+const getImageUrl = (imagePath: string | null): string | null => {
+    if (!imagePath) return null;
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        return imagePath;
+    }
+    
+    // If it starts with /api/images/, construct full URL with base URL
+    if (imagePath.startsWith('/api/images/')) {
+        return `https://foodapp.forthback.com${imagePath}`;
+    }
+    
+    // If it's just a filename, construct full URL
+    return `https://foodapp.forthback.com/api/images/${imagePath}`;
+};
 
 export default function PostsPage({ posts, filters }: PostsPageProps) {
     const [loading, setLoading] = useState(false);
@@ -127,17 +147,51 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
             dataIndex: 'title',
             key: 'title',
             sorter: true,
-            width: 300,
+            width: 250,
         },
         {
-            title: 'İçerik',
-            dataIndex: 'content',
-            key: 'content',
-            width: 400,
-            render: (content) => (
-                <Text ellipsis={{ tooltip: content }}>
-                    {content?.substring(0, 100)}...
+            title: 'Görsel',
+            dataIndex: 'image_url',
+            key: 'image_url',
+            width: 120,
+            render: (image_url) => (
+                image_url ? (
+                    <Image
+                        width={60}
+                        height={60}
+                        src={getImageUrl(image_url) || ''}
+                        alt="Post görseli"
+                        style={{ borderRadius: 8, objectFit: 'cover' }}
+                        placeholder
+                    />
+                ) : (
+                    <div className="w-15 h-15 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">
+                        Görsel Yok
+                    </div>
+                )
+            ),
+        },
+        {
+            title: 'Açıklama',
+            dataIndex: 'description',
+            key: 'description',
+            width: 350,
+            render: (description) => (
+                <Text ellipsis={{ tooltip: description }}>
+                    {description?.substring(0, 100)}...
                 </Text>
+            ),
+        },
+        {
+            title: 'Beğeni',
+            dataIndex: 'likes_count',
+            key: 'likes_count',
+            width: 80,
+            render: (likes_count) => (
+                <Space>
+                    <HeartOutlined className="text-red-500" />
+                    <Text>{likes_count || 0}</Text>
+                </Space>
             ),
         },
         {
@@ -259,9 +313,31 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
                         </div>
                         
                         <div>
-                            <Text strong>İçerik:</Text>
+                            <Text strong>Açıklama:</Text>
                             <div className="mt-2 p-3 bg-gray-50 rounded">
-                                <Text style={{ whiteSpace: 'pre-wrap' }}>{selectedPost.content}</Text>
+                                <Text style={{ whiteSpace: 'pre-wrap' }}>{selectedPost.description}</Text>
+                            </div>
+                        </div>
+
+                        {selectedPost.image_url && (
+                            <div>
+                                <Text strong>Görsel:</Text>
+                                <div className="mt-2">
+                                    <Image
+                                        width="100%"
+                                        src={getImageUrl(selectedPost.image_url)|| ''}
+                                        alt="Post görseli"
+                                        style={{ borderRadius: 8, maxHeight: 400, objectFit: 'cover' }}
+                                        placeholder
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <HeartOutlined className="text-red-500" />
+                                <Text>Beğeni: {selectedPost.likes_count || 0}</Text>
                             </div>
                         </div>
 

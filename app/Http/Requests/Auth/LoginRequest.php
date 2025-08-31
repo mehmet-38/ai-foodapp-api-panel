@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +46,17 @@ class LoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
+            ]);
+        }
+
+        // Admin rolü kontrolü - sadece admin kullanıcılar giriş yapabilir
+        /** @var User $user */
+        $user = Auth::user();
+        if (!$user->isAdmin()) {
+            Auth::logout(); // Kullanıcıyı logout et
+            
+            throw ValidationException::withMessages([
+                'email' => 'Bu panele sadece admin kullanıcılar erişebilir.',
             ]);
         }
 

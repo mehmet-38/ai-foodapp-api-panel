@@ -23,9 +23,7 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
-        'height',
-        'weight',
-        'age',
+        'role',
     ];
 
     /**
@@ -92,5 +90,21 @@ class User extends Authenticatable
     public function postLikes()
     {
         return $this->hasMany(PostLike::class);
+    }
+
+    /**
+     * Check if user is admin.
+     */
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is regular user.
+     */
+    public function isUser()
+    {
+        return $this->role === 'user';
     }
 }

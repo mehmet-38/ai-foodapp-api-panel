@@ -1,15 +1,10 @@
-import AuthenticatedSessionController from '@/actions/App/Http/Controllers/Auth/AuthenticatedSessionController';
-import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthLayout from '@/layouts/auth-layout';
-import { register } from '@/routes';
-import { request } from '@/routes/password';
-import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import React from 'react';
+import { Form, Input, Button, Checkbox, Card, Typography, Space, Divider, message } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
+
+const { Title, Text, Link } = Typography;
 
 interface LoginProps {
     status?: string;
@@ -17,72 +12,118 @@ interface LoginProps {
 }
 
 export default function Login({ status, canResetPassword }: LoginProps) {
+    const [loading, setLoading] = useState(false);
+    const [form] = Form.useForm();
+
+    const onFinish = async (values: any) => {
+        try {
+            setLoading(true);
+            router.post('/login', {
+                email: values.email,
+                password: values.password,
+                remember: values.remember || false,
+            });
+        } catch (error) {
+            message.error('Giriş yapılırken bir hata oluştu!');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <AuthLayout title="Log in to your account" description="Enter your email and password below to log in">
-            <Head title="Log in" />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+            <Head title="Admin Panel Girişi" />
+            
+            <div className="max-w-md w-full space-y-8">
+                <div className="text-center">
+                    <div className="mx-auto h-20 w-20 bg-orange-100 rounded-full flex items-center justify-center mb-6">
+                        <UserOutlined className="text-3xl text-orange-600" />
+                    </div>
+                    <Title level={2} className="text-gray-900">
+                        Food App Admin Panel
+                    </Title>
+                    <Text type="secondary" className="text-base">
+                        Yönetim paneline giriş yapın
+                    </Text>
+                </div>
 
-            <Form {...AuthenticatedSessionController.store.form()} resetOnSuccess={['password']} className="flex flex-col gap-6">
-                {({ processing, errors }) => (
-                    <>
-                        <div className="grid gap-6">
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    required
-                                    autoFocus
-                                    tabIndex={1}
-                                    autoComplete="email"
-                                    placeholder="email@example.com"
-                                />
-                                <InputError message={errors.email} />
-                            </div>
+                <Card className="shadow-lg border-0" style={{ borderRadius: 12 }}>
+                    {status && (
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <Text className="text-green-800 text-sm">{status}</Text>
+                        </div>
+                    )}
 
-                            <div className="grid gap-2">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
-                                    {canResetPassword && (
-                                        <TextLink href={request()} className="ml-auto text-sm" tabIndex={5}>
-                                            Forgot password?
-                                        </TextLink>
-                                    )}
-                                </div>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    name="password"
-                                    required
-                                    tabIndex={2}
-                                    autoComplete="current-password"
-                                    placeholder="Password"
-                                />
-                                <InputError message={errors.password} />
-                            </div>
+                    <Form
+                        form={form}
+                        name="login"
+                        onFinish={onFinish}
+                        layout="vertical"
+                        size="large"
+                        autoComplete="off"
+                    >
+                        <Form.Item
+                            name="email"
+                            label="E-mail Adresi"
+                            rules={[
+                                { required: true, message: 'E-mail adresi gereklidir!' },
+                                { type: 'email', message: 'Geçerli bir e-mail adresi giriniz!' }
+                            ]}
+                        >
+                            <Input
+                                prefix={<MailOutlined className="text-gray-400" />}
+                                placeholder="admin@foodapp.com"
+                                autoComplete="email"
+                            />
+                        </Form.Item>
 
-                            <div className="flex items-center space-x-3">
-                                <Checkbox id="remember" name="remember" tabIndex={3} />
-                                <Label htmlFor="remember">Remember me</Label>
-                            </div>
+                        <Form.Item
+                            name="password"
+                            label="Şifre"
+                            rules={[{ required: true, message: 'Şifre gereklidir!' }]}
+                        >
+                            <Input.Password
+                                prefix={<LockOutlined className="text-gray-400" />}
+                                placeholder="Şifrenizi giriniz"
+                                autoComplete="current-password"
+                            />
+                        </Form.Item>
 
-                            <Button type="submit" className="mt-4 w-full" tabIndex={4} disabled={processing}>
-                                {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                                Log in
+                        <div className="flex items-center justify-between mb-6">
+                            <Form.Item name="remember" valuePropName="checked" className="!mb-0">
+                                <Checkbox>Beni hatırla</Checkbox>
+                            </Form.Item>
+                            
+                            {canResetPassword && (
+                                <Link href="/forgot-password" className="text-sm">
+                                    Şifremi unuttum?
+                                </Link>
+                            )}
+                        </div>
+
+                        <Form.Item className="!mb-4">
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                loading={loading}
+                                className="w-full h-12 text-base font-medium"
+                                style={{ backgroundColor: '#f97316', borderColor: '#f97316' }}
+                            >
+                                {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
                             </Button>
-                        </div>
+                        </Form.Item>
+                        
+                       
 
-                        <div className="text-center text-sm text-muted-foreground">
-                            Don't have an account?{' '}
-                            <TextLink href={register()} tabIndex={5}>
-                                Sign up
-                            </TextLink>
-                        </div>
-                    </>
-                )}
-            </Form>
+                    </Form>
+                </Card>
 
-            {status && <div className="mb-4 text-center text-sm font-medium text-green-600">{status}</div>}
-        </AuthLayout>
+                <div className="text-center">
+                    <Text type="secondary" className="text-xs">
+                        © 2024 Food App Admin Panel. Tüm hakları saklıdır.
+                    </Text>
+                </div>
+            </div>
+        </div>
     );
 }
