@@ -398,6 +398,7 @@ class AdminController extends Controller
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
             'image_url' => 'sometimes|nullable|string|max:500',
+            'status' => 'sometimes|integer|in:0,1',
         ]);
 
         if ($validator->fails()) {

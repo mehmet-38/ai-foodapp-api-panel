@@ -23,9 +23,10 @@ class PostsController extends Controller
 
         $posts = Post::with('user')
             ->select([
-                'posts.id', 'posts.user_id', 'posts.title', 'posts.description', 
+                'posts.id', 'posts.user_id', 'posts.title', 'posts.description',
                 'posts.image_url', 'posts.likes_count', 'posts.created_at'
             ])
+            ->where('posts.status', 1)
             ->leftJoin('post_likes', function ($join) use ($user) {
                 $join->on('posts.id', '=', 'post_likes.post_id')
                      ->where('post_likes.user_id', '=', $user->id);
@@ -75,7 +76,7 @@ class PostsController extends Controller
 
         $posts = Post::where('posts.user_id', $user->id)
             ->select([
-                'id', 'user_id', 'title', 'description', 
+                'id', 'user_id', 'title', 'description',
                 'image_url', 'likes_count', 'created_at'
             ])
             ->offset($offset)
@@ -123,7 +124,7 @@ class PostsController extends Controller
         $posts = Post::with('user')
             ->where('posts.user_id', $userId)
             ->select([
-                'posts.id', 'posts.user_id', 'posts.title', 'posts.description', 
+                'posts.id', 'posts.user_id', 'posts.title', 'posts.description',
                 'posts.image_url', 'posts.likes_count', 'posts.created_at'
             ])
             ->leftJoin('post_likes', function ($join) use ($currentUser) {
@@ -170,7 +171,7 @@ class PostsController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $post = Post::with('user')
             ->where('id', $id)
             ->first();
@@ -262,7 +263,7 @@ class PostsController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $post = Post::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
@@ -317,7 +318,7 @@ class PostsController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $post = Post::where('id', $id)
             ->where('user_id', $user->id)
             ->first();
@@ -344,7 +345,7 @@ class PostsController extends Controller
     public function likePost(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $post = Post::find($id);
         if (!$post) {
             return response()->json([
@@ -385,7 +386,7 @@ class PostsController extends Controller
     public function unlikePost(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $post = Post::find($id);
         if (!$post) {
             return response()->json([

@@ -15,6 +15,7 @@ class Post extends Model
         'description',
         'image_url',
         'likes_count',
+        'status'
     ];
 
     protected $casts = [

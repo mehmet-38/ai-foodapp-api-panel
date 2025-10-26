@@ -25,6 +25,7 @@ interface Post {
     description: string;
     image_url?: string;
     likes_count: number;
+    status: number;
     created_at: string;
     user: {
         id: number;
@@ -70,6 +71,7 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
     const [loading, setLoading] = useState(false);
     const [selectedPost, setSelectedPost] = useState<Post | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [editModalVisible, setEditModalVisible] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
     const handleSearch = (value: string) => {
@@ -103,6 +105,11 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
         setModalVisible(true);
     };
 
+    const showEditModal = (post: Post) => {
+        setSelectedPost(post);
+        setEditModalVisible(true);
+    };
+
     const handleDeletePost = async (post: Post) => {
         try {
             setActionLoading(true);
@@ -119,6 +126,33 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
         } catch (error: any) {
             console.error('Delete post error:', error);
             message.error('Paylaşım silinirken bir hata oluştu!');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleUpdateStatus = async (status: number) => {
+        if (!selectedPost) return;
+        
+        try {
+            setActionLoading(true);
+            const response = await axios.put(`/admin/api/posts/${selectedPost.id}`, {
+                status: status
+            }, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (response.data.success) {
+                message.success('Paylaşım durumu başarıyla güncellendi!');
+                setEditModalVisible(false);
+                window.location.reload();
+            }
+        } catch (error: any) {
+            console.error('Update post status error:', error);
+            message.error('Paylaşım durumu güncellenirken bir hata oluştu!');
         } finally {
             setActionLoading(false);
         }
@@ -202,6 +236,28 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
             render: (date) => dayjs(date).format('DD.MM.YYYY HH:mm'),
         },
         {
+            title: 'Durum',
+            dataIndex: 'status',
+            key: 'status',
+            width: 100,
+            render: (status) => (
+                <Tag color={status === 1 ? 'green' : 'red'}>
+                    {status === 1 ? 'Aktif' : 'Pasif'}
+                </Tag>
+            ),
+        },
+        {
+            title: 'Durum',
+            dataIndex: 'status',
+            key: 'status',
+            width: 100,
+            render: (status) => (
+                <Tag color={status === 1 ? 'green' : 'red'}>
+                    {status === 1 ? 'Aktif' : 'Pasif'}
+                </Tag>
+            ),
+        },
+        {
             title: 'İşlemler',
             key: 'actions',
             width: 120,
@@ -217,6 +273,7 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
                         type="link" 
                         icon={<EditOutlined />} 
                         size="small"
+                        onClick={() => showEditModal(record)}
                     />
                     <Popconfirm
                         title="Paylaşım Silme"
@@ -339,6 +396,12 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
                                 <HeartOutlined className="text-red-500" />
                                 <Text>Beğeni: {selectedPost.likes_count || 0}</Text>
                             </div>
+                            <div className="flex items-center gap-2">
+                                <Text>Durum:</Text>
+                                <Tag color={selectedPost.status === 1 ? 'green' : 'red'}>
+                                    {selectedPost.status === 1 ? 'Aktif' : 'Pasif'}
+                                </Tag>
+                            </div>
                         </div>
 
                         <div className="pt-4 border-t">
@@ -355,6 +418,47 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
                                     <Text>{selectedPost.user.email}</Text>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Post Edit Modal */}
+            <Modal
+                title="Paylaşım Durumunu Güncelle"
+                open={editModalVisible}
+                onCancel={() => setEditModalVisible(false)}
+                footer={null}
+                width={500}
+            >
+                {selectedPost && (
+                    <div className="space-y-4">
+                        <div className="pb-4 border-b">
+                            <Title level={5} className="!mb-2">{selectedPost.title}</Title>
+                            <Text type="secondary">Mevcut durum: </Text>
+                            <Tag color={selectedPost.status === 1 ? 'green' : 'red'}>
+                                {selectedPost.status === 1 ? 'Aktif' : 'Pasif'}
+                            </Tag>
+                        </div>
+                        
+                        <div className="flex justify-center gap-4 pt-4">
+                            <Button 
+                                type={selectedPost.status === 0 ? "primary" : "default"}
+                                onClick={() => handleUpdateStatus(1)}
+                                loading={actionLoading}
+                                size="large"
+                            >
+                                Aktif Yap
+                            </Button>
+                            <Button 
+                                type={selectedPost.status === 1 ? "primary" : "default"}
+                                danger={selectedPost.status === 1}
+                                onClick={() => handleUpdateStatus(0)}
+                                loading={actionLoading}
+                                size="large"
+                            >
+                                Pasif Yap
+                            </Button>
                         </div>
                     </div>
                 )}
