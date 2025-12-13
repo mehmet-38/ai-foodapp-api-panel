@@ -24,6 +24,9 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'is_premium',
+        'premium_package_id',
+        'premium_until',
     ];
 
     /**
@@ -49,6 +52,8 @@ class User extends Authenticatable
             'height' => 'float',
             'weight' => 'float',
             'age' => 'integer',
+            'is_premium' => 'boolean',
+            'premium_until' => 'datetime',
         ];
     }
 
@@ -106,5 +111,13 @@ class User extends Authenticatable
     public function isUser()
     {
         return $this->role === 'user';
+    }
+
+    /**
+     * Get the premium package associated with the user.
+     */
+    public function premiumPackage()
+    {
+        return $this->belongsTo(PremiumPackage::class);
     }
 }

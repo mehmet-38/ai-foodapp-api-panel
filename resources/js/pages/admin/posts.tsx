@@ -246,17 +246,7 @@ export default function PostsPage({ posts, filters }: PostsPageProps) {
                 </Tag>
             ),
         },
-        {
-            title: 'Durum',
-            dataIndex: 'status',
-            key: 'status',
-            width: 100,
-            render: (status) => (
-                <Tag color={status === 1 ? 'green' : 'red'}>
-                    {status === 1 ? 'Aktif' : 'Pasif'}
-                </Tag>
-            ),
-        },
+     
         {
             title: 'İşlemler',
             key: 'actions',

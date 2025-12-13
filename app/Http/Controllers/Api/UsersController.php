@@ -28,6 +28,12 @@ class UsersController extends Controller
                 'weight' => $user->weight,
                 'age' => $user->age,
                 'created_at' => $user->created_at,
+                'is_premium' => (bool) $user->is_premium,
+                'premium_until' => $user->premium_until,
+                'premium_package' => $user->premiumPackage ? [
+                    'id' => $user->premiumPackage->id,
+                    'name' => $user->premiumPackage->name
+                ] : null,
             ]
         ]);
     }

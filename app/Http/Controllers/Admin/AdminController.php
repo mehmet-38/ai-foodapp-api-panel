@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Recipe;
 use App\Models\Post;
+use App\Models\PremiumPackage;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,7 @@ class AdminController extends Controller
                             ->orWhere('name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
             })
+            ->with('premiumPackage')
             ->latest()
             ->paginate($perPage);
 
@@ -114,6 +116,31 @@ class AdminController extends Controller
     }
 
     /**
+     * Show packages management page
+     */
+    public function packages(Request $request)
+    {
+        $search = $request->get('search');
+        $perPage = $request->get('per_page', 10);
+
+        $packages = PremiumPackage::query()
+            ->when($search, function ($query, $search) {
+                return $query->where('name', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->latest()
+            ->paginate($perPage);
+
+        return Inertia::render('admin/packages', [
+            'packages' => $packages,
+            'filters' => [
+                'search' => $search,
+                'per_page' => $perPage,
+            ]
+        ]);
+    }
+
+    /**
      * Get dashboard statistics API
      */
     public function getDashboardStats()
@@ -134,6 +161,19 @@ class AdminController extends Controller
     }
 
     /**
+     * Get list of active packages for dropdowns
+     */
+    public function getPackagesList()
+    {
+        $packages = PremiumPackage::where('is_active', true)->get(['id', 'name']);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $packages
+        ]);
+    }
+
+    /**
      * Store a new user
      * POST /admin/api/users
      */
@@ -148,6 +188,9 @@ class AdminController extends Controller
             'height' => 'nullable|numeric|min:0',
             'weight' => 'nullable|numeric|min:0',
             'age' => 'nullable|integer|min:0|max:150',
+            'is_premium' => 'boolean',
+            'premium_package_id' => 'nullable|exists:premium_packages,id',
+            'premium_until' => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
@@ -167,6 +210,9 @@ class AdminController extends Controller
             'height' => $request->height,
             'weight' => $request->weight,
             'age' => $request->age,
+            'is_premium' => $request->is_premium ?? false,
+            'premium_package_id' => $request->premium_package_id,
+            'premium_until' => $request->premium_until,
         ]);
 
         return response()->json([
@@ -200,6 +246,9 @@ class AdminController extends Controller
             'height' => 'sometimes|nullable|numeric|min:0',
             'weight' => 'sometimes|nullable|numeric|min:0',
             'age' => 'sometimes|nullable|integer|min:0|max:150',
+            'is_premium' => 'boolean',
+            'premium_package_id' => 'nullable|exists:premium_packages,id',
+            'premium_until' => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
@@ -210,7 +259,10 @@ class AdminController extends Controller
             ], 422);
         }
 
-        $updateData = $request->only(['name', 'username', 'email', 'role', 'height', 'weight', 'age']);
+        $updateData = $request->only([
+            'name', 'username', 'email', 'role', 'height', 'weight', 'age',
+            'is_premium', 'premium_package_id', 'premium_until'
+        ]);
         
         if ($request->has('password')) {
             $updateData['password'] = Hash::make($request->password);
@@ -438,6 +490,110 @@ class AdminController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Post deleted successfully'
+        ]);
+    }
+
+    /**
+     * Store a new premium package
+     * POST /admin/api/packages
+     */
+    public function storePackage(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255|unique:premium_packages',
+            'price_monthly' => 'required|numeric|min:0',
+            'price_yearly' => 'required|numeric|min:0',
+            'trial_days' => 'required|integer|min:0',
+            'description' => 'nullable|string',
+            'is_active' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $package = PremiumPackage::create($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Paket başarıyla oluşturuldu',
+            'data' => $package
+        ], 201);
+    }
+
+    /**
+     * Update an existing premium package
+     * PUT /admin/api/packages/{id}
+     */
+    public function updatePackage(Request $request, $id)
+    {
+        $package = PremiumPackage::find($id);
+
+        if (!$package) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Paket bulunamadı'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|string|max:255|unique:premium_packages,name,' . $id,
+            'price_monthly' => 'sometimes|numeric|min:0',
+            'price_yearly' => 'sometimes|numeric|min:0',
+            'trial_days' => 'sometimes|integer|min:0',
+            'description' => 'nullable|string',
+            'is_active' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $package->update($request->all());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Paket başarıyla güncellendi',
+            'data' => $package
+        ]);
+    }
+
+    /**
+     * Delete a premium package
+     * DELETE /admin/api/packages/{id}
+     */
+    public function deletePackage($id)
+    {
+        $package = PremiumPackage::find($id);
+
+        if (!$package) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Paket bulunamadı'
+            ], 404);
+        }
+
+        // Check if package is used by any user
+        if ($package->users()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bu paketi kullanan kullanıcılar var, silinemez. Pasife almayı deneyin.'
+            ], 400);
+        }
+
+        $package->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Paket başarıyla silindi'
         ]);
     }
 }

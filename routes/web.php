@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::get('/recipes', [AdminController::class, 'recipes'])->name('recipes');
     Route::get('/posts', [AdminController::class, 'posts'])->name('posts');
+    Route::get('/packages', [AdminController::class, 'packages'])->name('packages');
     
     // Admin API endpoints
     Route::get('/api/stats', [AdminController::class, 'getDashboardStats'])->name('api.stats');
@@ -36,6 +37,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::post('/api/posts', [AdminController::class, 'storePost'])->name('api.posts.store');
     Route::put('/api/posts/{id}', [AdminController::class, 'updatePost'])->name('api.posts.update');
     Route::delete('/api/posts/{id}', [AdminController::class, 'deletePost'])->name('api.posts.delete');
+    
+    // Packages management API endpoints
+    Route::get('/api/packages/list', [AdminController::class, 'getPackagesList'])->name('api.packages.list');
+    Route::post('/api/packages', [AdminController::class, 'storePackage'])->name('api.packages.store');
+    Route::put('/api/packages/{id}', [AdminController::class, 'updatePackage'])->name('api.packages.update');
+    Route::delete('/api/packages/{id}', [AdminController::class, 'deletePackage'])->name('api.packages.delete');
 });
 
 require __DIR__.'/settings.php';

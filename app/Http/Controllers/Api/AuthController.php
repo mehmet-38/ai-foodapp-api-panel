@@ -48,7 +48,10 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'username' => $user->username,
-                'email' => $user->email
+                'email' => $user->email,
+                'is_premium' => false,
+                'premium_until' => null,
+                'premium_package' => null,
             ]
         ], 201);
     }
@@ -90,6 +93,12 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'username' => $user->username,
                 'email' => $user->email,
+                'is_premium' => (bool) $user->is_premium,
+                'premium_until' => $user->premium_until,
+                'premium_package' => $user->premiumPackage ? [
+                    'id' => $user->premiumPackage->id,
+                    'name' => $user->premiumPackage->name
+                ] : null,
             ]
         ]);
     }
@@ -109,6 +118,12 @@ class AuthController extends Controller
                 'username' => $user->username,
                 'email' => $user->email,
                 'created_at' => $user->created_at,
+                'is_premium' => (bool) $user->is_premium,
+                'premium_until' => $user->premium_until,
+                'premium_package' => $user->premiumPackage ? [
+                    'id' => $user->premiumPackage->id,
+                    'name' => $user->premiumPackage->name
+                ] : null,
             ]
         ]);
     }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\RecipesController;
 use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\DietsController;
 use App\Http\Controllers\Api\PostsController;
+use App\Http\Controllers\Api\PremiumController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Public routes
+Route::get('/premium/packages', [PremiumController::class, 'index']);
+
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
