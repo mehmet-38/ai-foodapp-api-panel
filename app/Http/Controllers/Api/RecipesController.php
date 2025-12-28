@@ -33,7 +33,9 @@ class RecipesController extends Controller
 
         $recipes = $query->select([
                 'id', 'name', 'description', 'ingredients', 'instructions', 
-                'image_url', 'prep_time', 'cook_time', 'servings', 'created_at'
+                'image_url', 'prep_time', 'cook_time', 'servings', 'created_at',
+                'unsplash_photographer', 'unsplash_photographer_url', 'unsplash_download_location',
+                'calories', 'protein', 'carbohydrates', 'fat'
             ])
             ->offset($offset)
             ->limit($limit)
@@ -83,6 +85,13 @@ class RecipesController extends Controller
             'prep_time' => 'nullable|integer|min:0',
             'cook_time' => 'nullable|integer|min:0',
             'servings' => 'nullable|integer|min:1',
+            'unsplash_photographer' => 'nullable|string',
+            'unsplash_photographer_url' => 'nullable|string',
+            'unsplash_download_location' => 'nullable|string',
+            'calories' => 'nullable|integer|min:0',
+            'protein' => 'nullable|numeric|min:0',
+            'carbohydrates' => 'nullable|numeric|min:0',
+            'fat' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -124,6 +133,13 @@ class RecipesController extends Controller
             'prep_time' => 'sometimes|nullable|integer|min:0',
             'cook_time' => 'sometimes|nullable|integer|min:0',
             'servings' => 'sometimes|nullable|integer|min:1',
+            'unsplash_photographer' => 'sometimes|nullable|string',
+            'unsplash_photographer_url' => 'sometimes|nullable|string',
+            'unsplash_download_location' => 'sometimes|nullable|string',
+            'calories' => 'sometimes|nullable|integer|min:0',
+            'protein' => 'sometimes|nullable|numeric|min:0',
+            'carbohydrates' => 'sometimes|nullable|numeric|min:0',
+            'fat' => 'sometimes|nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -193,7 +209,9 @@ class RecipesController extends Controller
 
         $recipes = $query->select([
                 'id', 'name', 'description', 'ingredients', 'instructions', 
-                'image_url', 'prep_time', 'cook_time', 'servings', 'created_at'
+                'image_url', 'prep_time', 'cook_time', 'servings', 'created_at',
+                'unsplash_photographer', 'unsplash_photographer_url', 'unsplash_download_location',
+                'calories', 'protein', 'carbohydrates', 'fat'
             ])
             ->limit($limit)
             ->orderBy('created_at', 'desc')

@@ -18,12 +18,23 @@ class Recipe extends Model
         'prep_time',
         'cook_time',
         'servings',
+        'unsplash_photographer',
+        'unsplash_photographer_url',
+        'unsplash_download_location',
+        'calories',
+        'protein',
+        'carbohydrates',
+        'fat',
     ];
 
     protected $casts = [
         'prep_time' => 'integer',
         'cook_time' => 'integer',
         'servings' => 'integer',
+        'calories' => 'integer',
+        'protein' => 'float',
+        'carbohydrates' => 'float',
+        'fat' => 'float',
     ];
 
     /**

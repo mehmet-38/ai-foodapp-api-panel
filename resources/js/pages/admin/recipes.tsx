@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Table, Input, Button, Tag, Space, Card, Typography, Modal, Image, Form, InputNumber, message, Popconfirm } from 'antd';
-import { 
-    SearchOutlined, 
-    EyeOutlined, 
+import {
+    SearchOutlined,
+    EyeOutlined,
     EditOutlined,
     DeleteOutlined,
     ReloadOutlined,
@@ -21,17 +21,17 @@ const { Title, Text } = Typography;
 // Helper function to construct full image URL
 const getImageUrl = (imagePath: string | null): string | null => {
     if (!imagePath) return null;
-    
+
     // If it's already a full URL, return as is
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
         return imagePath;
     }
-    
+
     // If it starts with /api/images/, construct full URL with base URL
     if (imagePath.startsWith('/api/images/')) {
         return `https://foodapp.forthback.com${imagePath}`;
     }
-    
+
     // If it's just a filename, construct full URL
     return `https://foodapp.forthback.com/api/images/${imagePath}`;
 };
@@ -47,6 +47,13 @@ interface Recipe {
     cook_time: number;
     servings: number;
     created_at: string;
+    unsplash_photographer?: string;
+    unsplash_photographer_url?: string;
+    unsplash_download_location?: string;
+    calories?: number;
+    protein?: number;
+    carbohydrates?: number;
+    fat?: number;
 }
 
 interface RecipesPageProps {
@@ -74,9 +81,9 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
 
     const handleSearch = (value: string) => {
         setLoading(true);
-        router.get('/admin/recipes', 
+        router.get('/admin/recipes',
             { search: value, per_page: filters.per_page },
-            { 
+            {
                 preserveState: true,
                 onFinish: () => setLoading(false)
             }
@@ -86,7 +93,7 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
     const handleTableChange = (pagination: any) => {
         setLoading(true);
         router.get('/admin/recipes',
-            { 
+            {
                 search: filters.search,
                 page: pagination.current,
                 per_page: pagination.pageSize
@@ -131,7 +138,7 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                     'X-Requested-With': 'XMLHttpRequest',
                 },
             });
-            
+
             if (response.data.success) {
                 message.success('Tarif başarıyla silindi!');
                 window.location.reload();
@@ -216,15 +223,15 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
             width: 120,
             render: (_, record) => (
                 <Space size="small">
-                    <Button 
-                        type="link" 
-                        icon={<EyeOutlined />} 
+                    <Button
+                        type="link"
+                        icon={<EyeOutlined />}
                         size="small"
                         onClick={() => showRecipeDetails(record)}
                     />
-                    <Button 
-                        type="link" 
-                        icon={<EditOutlined />} 
+                    <Button
+                        type="link"
+                        icon={<EditOutlined />}
                         size="small"
                         onClick={() => handleEditRecipe(record)}
                     />
@@ -236,9 +243,9 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                         cancelText="Hayır"
                         okButtonProps={{ loading: actionLoading }}
                     >
-                        <Button 
-                            type="link" 
-                            icon={<DeleteOutlined />} 
+                        <Button
+                            type="link"
+                            icon={<DeleteOutlined />}
                             size="small"
                             danger
                             loading={actionLoading}
@@ -252,16 +259,16 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
     return (
         <AdminLayout title="Tarif Yönetimi">
             <Head title="Admin - Tarifler" />
-            
+
             <Card>
                 <div className="mb-4 flex justify-between items-center">
                     <div>
                         <Title level={4} className="!mb-1">Tarifler</Title>
                         <Text type="secondary">Toplam {recipes.total} tarif</Text>
                     </div>
-                    
+
                     <Space>
-                        <Button 
+                        <Button
                             type="primary"
                             icon={<PlusOutlined />}
                             onClick={handleCreateRecipe}
@@ -276,7 +283,7 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                             defaultValue={filters.search}
                             loading={loading}
                         />
-                        <Button 
+                        <Button
                             icon={<ReloadOutlined />}
                             onClick={() => window.location.reload()}
                         >
@@ -296,7 +303,7 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                         pageSize: recipes.per_page,
                         showSizeChanger: true,
                         showQuickJumper: true,
-                        showTotal: (total, range) => 
+                        showTotal: (total, range) =>
                             `${range[0]}-${range[1]} / ${total} tarif`,
                         pageSizeOptions: ['10', '25', '50', '100'],
                     }}
@@ -329,7 +336,7 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                             <Title level={3} className="!mt-2 !mb-1">{selectedRecipe.name}</Title>
                             <Text type="secondary">{selectedRecipe.description}</Text>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <Text strong>Hazırlık Süresi:</Text>
@@ -347,11 +354,41 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                                 <Text>{selectedRecipe.servings} kişilik</Text>
                             </div>
                             <div>
-                                <Text strong>Oluşturulma Tarihi:</Text>
-                                <br />
                                 <Text>{dayjs(selectedRecipe.created_at).format('DD.MM.YYYY HH:mm')}</Text>
                             </div>
                         </div>
+
+                        {/* Nutrition Info */}
+                        {(selectedRecipe.calories || selectedRecipe.protein || selectedRecipe.carbohydrates || selectedRecipe.fat) && (
+                            <div>
+                                <Text strong>Besin Değerleri (100g):</Text>
+                                <div className="mt-2 grid grid-cols-4 gap-4 p-3 bg-gray-50 rounded">
+                                    <div className="text-center">
+                                        <Text type="secondary" className="block text-xs">Kalori</Text>
+                                        <Text strong>{selectedRecipe.calories} kcal</Text>
+                                    </div>
+                                    <div className="text-center">
+                                        <Text type="secondary" className="block text-xs">Protein</Text>
+                                        <Text strong>{selectedRecipe.protein}g</Text>
+                                    </div>
+                                    <div className="text-center">
+                                        <Text type="secondary" className="block text-xs">Karbonhidrat</Text>
+                                        <Text strong>{selectedRecipe.carbohydrates}g</Text>
+                                    </div>
+                                    <div className="text-center">
+                                        <Text type="secondary" className="block text-xs">Yağ</Text>
+                                        <Text strong>{selectedRecipe.fat}g</Text>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Unsplash Credit */}
+                        {selectedRecipe.image_url && selectedRecipe.unsplash_photographer && (
+                            <div className="text-xs text-center text-gray-500">
+                                Fotoğraf: <a href={selectedRecipe.unsplash_photographer_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{selectedRecipe.unsplash_photographer}</a> (Unsplash)
+                            </div>
+                        )}
 
                         <div>
                             <Text strong>Malzemeler:</Text>
