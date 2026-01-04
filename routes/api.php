@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::get('/premium/packages', [PremiumController::class, 'index']);
+Route::post('/revenuecat/webhook', [App\Http\Controllers\Api\RevenueCatController::class, 'handleWebhook']);
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);

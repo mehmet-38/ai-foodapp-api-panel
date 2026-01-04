@@ -117,7 +117,12 @@ class UsersController extends Controller
         $recipes = Recipe::whereHas('savedRecipes', function($query) use ($user) {
             $query->where('user_id', $user->id);
         })
-        ->select(['id', 'name', 'description', 'ingredients', 'instructions', 'image_url', 'prep_time', 'cook_time', 'servings', 'created_at'])
+        ->select([
+            'id', 'name', 'description', 'ingredients', 'instructions', 
+            'image_url', 'prep_time', 'cook_time', 'servings', 'created_at',
+            'unsplash_photographer', 'unsplash_photographer_url', 'unsplash_download_location',
+            'calories', 'protein', 'carbohydrates', 'fat'
+        ])
         ->get();
 
         return response()->json([

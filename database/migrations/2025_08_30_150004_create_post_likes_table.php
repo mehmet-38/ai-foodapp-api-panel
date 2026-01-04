@@ -18,8 +18,9 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
             
             $table->unique(['user_id', 'post_id'], 'unique_user_post_like');
-            $table->index('post_id', 'idx_post_id');
-            $table->index('user_id', 'idx_user_id');
+            // Indices are automatically created for foreign keys
+            //$table->index('post_id', 'idx_post_id');
+            //$table->index('user_id', 'idx_user_id');
         });
     }
 
