@@ -24,7 +24,7 @@ class PostsController extends Controller
         $posts = Post::with('user')
             ->select([
                 'posts.id', 'posts.user_id', 'posts.title', 'posts.description',
-                'posts.image_url', 'posts.likes_count', 'posts.created_at'
+                'posts.image_url', 'posts.category', 'posts.difficulty', 'posts.likes_count', 'posts.created_at'
             ])
             ->where('posts.status', 1)
             ->leftJoin('post_likes', function ($join) use ($user) {
@@ -43,6 +43,8 @@ class PostsController extends Controller
                     'title' => $post->title,
                     'description' => $post->description,
                     'image_url' => $post->image_url,
+                    'category' => $post->category,
+                    'difficulty' => $post->difficulty,
                     'username' => $post->user->username,
                     'email' => $post->user->email,
                     'likes_count' => $post->likes_count,
@@ -77,7 +79,7 @@ class PostsController extends Controller
         $posts = Post::where('posts.user_id', $user->id)
             ->select([
                 'id', 'user_id', 'title', 'description',
-                'image_url', 'likes_count', 'created_at'
+                'image_url', 'category', 'difficulty', 'likes_count', 'created_at'
             ])
             ->offset($offset)
             ->limit($limit)
@@ -90,6 +92,8 @@ class PostsController extends Controller
                     'title' => $post->title,
                     'description' => $post->description,
                     'image_url' => $post->image_url,
+                    'category' => $post->category,
+                    'difficulty' => $post->difficulty,
                     'username' => $user->username,
                     'email' => $user->email,
                     'likes_count' => $post->likes_count,
@@ -125,7 +129,7 @@ class PostsController extends Controller
             ->where('posts.user_id', $userId)
             ->select([
                 'posts.id', 'posts.user_id', 'posts.title', 'posts.description',
-                'posts.image_url', 'posts.likes_count', 'posts.created_at'
+                'posts.image_url', 'posts.category', 'posts.difficulty', 'posts.likes_count', 'posts.created_at'
             ])
             ->leftJoin('post_likes', function ($join) use ($currentUser) {
                 $join->on('posts.id', '=', 'post_likes.post_id')
@@ -143,6 +147,8 @@ class PostsController extends Controller
                     'title' => $post->title,
                     'description' => $post->description,
                     'image_url' => $post->image_url,
+                    'category' => $post->category,
+                    'difficulty' => $post->difficulty,
                     'username' => $post->user->username,
                     'email' => $post->user->email,
                     'likes_count' => $post->likes_count,
@@ -193,6 +199,8 @@ class PostsController extends Controller
             'title' => $post->title,
             'description' => $post->description,
             'image_url' => $post->image_url,
+            'category' => $post->category,
+            'difficulty' => $post->difficulty,
             'username' => $post->user->username,
             'email' => $post->user->email,
             'likes_count' => $post->likes_count,
@@ -218,6 +226,8 @@ class PostsController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'image_url' => 'nullable|string|max:500',
+            'category' => 'nullable|string',
+            'difficulty' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -233,6 +243,8 @@ class PostsController extends Controller
             'title' => $request->title,
             'description' => $request->description,
             'image_url' => $request->image_url,
+            'category' => $request->category ?? 'Diğer',
+            'difficulty' => $request->difficulty ?? 'Orta',
             'likes_count' => 0,
         ]);
 
@@ -242,6 +254,8 @@ class PostsController extends Controller
             'title' => $post->title,
             'description' => $post->description,
             'image_url' => $post->image_url,
+            'category' => $post->category,
+            'difficulty' => $post->difficulty,
             'username' => $user->username,
             'email' => $user->email,
             'likes_count' => $post->likes_count,
@@ -279,6 +293,8 @@ class PostsController extends Controller
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|nullable|string',
             'image_url' => 'sometimes|nullable|string|max:500',
+            'category' => 'sometimes|nullable|string',
+            'difficulty' => 'sometimes|nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -289,7 +305,7 @@ class PostsController extends Controller
             ], 422);
         }
 
-        $post->update($request->only(['title', 'description', 'image_url']));
+        $post->update($request->only(['title', 'description', 'image_url', 'category', 'difficulty']));
 
         $postData = [
             'id' => $post->id,
@@ -297,6 +313,8 @@ class PostsController extends Controller
             'title' => $post->title,
             'description' => $post->description,
             'image_url' => $post->image_url,
+            'category' => $post->category,
+            'difficulty' => $post->difficulty,
             'username' => $user->username,
             'email' => $user->email,
             'likes_count' => $post->likes_count,
