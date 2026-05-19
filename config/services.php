@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'firebase' => [
+        'project_id' => env('FIREBASE_PROJECT_ID', 'aifoodapp-bedbd'),
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+        'credentials_json' => env('FIREBASE_CREDENTIALS_JSON'),
+        'credentials_base64' => env('FIREBASE_CREDENTIALS_BASE64'),
+    ],
+
 ];

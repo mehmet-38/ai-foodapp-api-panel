@@ -19,6 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $compiledViewsPath = config('view.compiled');
+
+        if (is_string($compiledViewsPath) && $compiledViewsPath !== '' && ! is_dir($compiledViewsPath)) {
+            @mkdir($compiledViewsPath, 0775, true);
+        }
     }
 }

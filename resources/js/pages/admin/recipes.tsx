@@ -151,6 +151,78 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
         }
     };
 
+    const handleCreateSubmit = async (values: any) => {
+        try {
+            setActionLoading(true);
+            const response = await axios.post('/admin/api/recipes', values, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (response.data.success) {
+                message.success('Tarif oluşturuldu!');
+                setCreateModalVisible(false);
+                window.location.reload();
+            }
+        } catch (error: any) {
+            message.error(error.response?.data?.message || 'Tarif oluşturulamadı!');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleEditSubmit = async (values: any) => {
+        if (!selectedRecipe) return;
+        try {
+            setActionLoading(true);
+            const response = await axios.put(`/admin/api/recipes/${selectedRecipe.id}`, values, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (response.data.success) {
+                message.success('Tarif güncellendi!');
+                setEditModalVisible(false);
+                window.location.reload();
+            }
+        } catch (error: any) {
+            message.error(error.response?.data?.message || 'Tarif güncellenemedi!');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const recipeForm = (onFinish: (values: any) => void) => (
+        <Form form={form} layout="vertical" onFinish={onFinish}>
+            <Form.Item name="name" label="Tarif Adı" rules={[{ required: true }]}>
+                <Input />
+            </Form.Item>
+            <Form.Item name="description" label="Açıklama">
+                <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.Item name="image_url" label="Görsel URL">
+                <Input />
+            </Form.Item>
+            <div className="grid grid-cols-3 gap-4">
+                <Form.Item name="prep_time" label="Hazırlık">
+                    <InputNumber style={{ width: '100%' }} />
+                </Form.Item>
+                <Form.Item name="cook_time" label="Pişirme">
+                    <InputNumber style={{ width: '100%' }} />
+                </Form.Item>
+                <Form.Item name="servings" label="Porsiyon">
+                    <InputNumber style={{ width: '100%' }} />
+                </Form.Item>
+            </div>
+            <Form.Item name="ingredients" label="Malzemeler" rules={[{ required: true }]}>
+                <Input.TextArea rows={4} />
+            </Form.Item>
+            <Form.Item name="instructions" label="Yapılış" rules={[{ required: true }]}>
+                <Input.TextArea rows={4} />
+            </Form.Item>
+            <div className="flex justify-end gap-2">
+                <Button onClick={() => { setCreateModalVisible(false); setEditModalVisible(false); }}>İptal</Button>
+                <Button type="primary" htmlType="submit" loading={actionLoading}>Kaydet</Button>
+            </div>
+        </Form>
+    );
+
     const columns: ColumnsType<Recipe> = [
         {
             title: 'Görsel',
@@ -405,6 +477,26 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            <Modal
+                title="Yeni Tarif"
+                open={createModalVisible}
+                onCancel={() => setCreateModalVisible(false)}
+                footer={null}
+                width={760}
+            >
+                {recipeForm(handleCreateSubmit)}
+            </Modal>
+
+            <Modal
+                title="Tarif Düzenle"
+                open={editModalVisible}
+                onCancel={() => setEditModalVisible(false)}
+                footer={null}
+                width={760}
+            >
+                {recipeForm(handleEditSubmit)}
             </Modal>
         </AdminLayout>
     );

@@ -3,597 +3,371 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Recipe;
-use App\Models\Post;
-use App\Models\PremiumPackage;
+use App\Services\Firebase\FirebaseService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class AdminController extends Controller
 {
-    /**
-     * Show the admin dashboard
-     */
+    public function __construct(private readonly FirebaseService $firebase)
+    {
+    }
+
     public function dashboard()
     {
-        // Dashboard istatistikleri
-        $stats = [
-            'totalUsers' => User::count(),
-            'totalRecipes' => Recipe::count(),
-            'totalPosts' => Post::count(),
-        ];
-
-        // Son aktiviteler (örnek veri, ihtiyaca göre özelleştirilebilir)
-        $recentUsers = User::latest()->take(5)->get(['id', 'username', 'created_at']);
-        $recentRecipes = Recipe::latest()->take(5)->get(['id', 'name', 'created_at']);
+        $users = collect($this->firebase->listUsers())->take(5)->values();
+        $recipes = collect($this->firebase->listRecipes())->take(5)->values();
 
         return Inertia::render('admin/dashboard', [
-            'stats' => $stats,
-            'recentUsers' => $recentUsers,
-            'recentRecipes' => $recentRecipes,
+            'stats' => $this->firebase->dashboardStats(),
+            'recentUsers' => $users,
+            'recentRecipes' => $recipes,
+            'firebaseConfigured' => $this->firebase->isConfigured(),
         ]);
     }
 
-    /**
-     * Show users management page
-     */
     public function users(Request $request)
     {
         $search = $request->get('search');
-        $perPage = $request->get('per_page', 10);
-
-        $users = User::query()
-            ->when($search, function ($query, $search) {
-                return $query->where('username', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
-            })
-            ->with('premiumPackage')
-            ->latest()
-            ->paginate($perPage);
+        $perPage = (int) $request->get('per_page', 10);
+        $page = (int) $request->get('page', 1);
 
         return Inertia::render('admin/users', [
-            'users' => $users,
-            'filters' => [
-                'search' => $search,
-                'per_page' => $perPage,
-            ]
+            'users' => $this->firebase->paginate(
+                $this->firebase->listUsers(),
+                $page,
+                $perPage,
+                $search,
+                ['username', 'name', 'email']
+            ),
+            'filters' => ['search' => $search, 'per_page' => $perPage],
         ]);
     }
 
-    /**
-     * Show recipes management page
-     */
     public function recipes(Request $request)
     {
         $search = $request->get('search');
-        $perPage = $request->get('per_page', 10);
-
-        $recipes = Recipe::query()
-            ->when($search, function ($query, $search) {
-                return $query->where('name', 'like', "%{$search}%")
-                            ->orWhere('description', 'like', "%{$search}%");
-            })
-            ->latest()
-            ->paginate($perPage);
+        $perPage = (int) $request->get('per_page', 10);
+        $page = (int) $request->get('page', 1);
+        $recipes = collect($this->firebase->listRecipes())->map(fn (array $recipe) => [
+            ...$recipe,
+            'created_at' => $recipe['createdAt'] ?? $recipe['created_at'] ?? null,
+            'image_url' => $recipe['image_url'] ?? $recipe['imageUrl'] ?? null,
+        ])->all();
 
         return Inertia::render('admin/recipes', [
-            'recipes' => $recipes,
-            'filters' => [
-                'search' => $search,
-                'per_page' => $perPage,
-            ]
+            'recipes' => $this->firebase->paginate(
+                $recipes,
+                $page,
+                $perPage,
+                $search,
+                ['name', 'description', 'ingredients', 'category']
+            ),
+            'filters' => ['search' => $search, 'per_page' => $perPage],
         ]);
     }
 
-    /**
-     * Show posts management page
-     */
     public function posts(Request $request)
     {
         $search = $request->get('search');
-        $perPage = $request->get('per_page', 10);
+        $perPage = (int) $request->get('per_page', 10);
+        $page = (int) $request->get('page', 1);
 
-        $posts = Post::with('user')
-            ->when($search, function ($query, $search) {
-                return $query->where('title', 'like', "%{$search}%")
-                            ->orWhere('description', 'like', "%{$search}%");
-            })
-            ->latest()
-            ->paginate($perPage);
+        $usersById = collect($this->firebase->listUsers())->keyBy('uid');
+        $posts = collect($this->firebase->listPosts())->map(function (array $post) use ($usersById) {
+            $user = $usersById->get($post['userId'] ?? '', []);
+
+            return [
+                ...$post,
+                'image_url' => $post['imageUrl'] ?? $post['image_url'] ?? null,
+                'likes_count' => $post['likesCount'] ?? $post['likes_count'] ?? 0,
+                'created_at' => $post['createdAt'] ?? $post['created_at'] ?? null,
+                'status' => (int) (bool) ($post['status'] ?? true),
+                'user' => [
+                    'id' => $post['userId'] ?? '',
+                    'uid' => $post['userId'] ?? '',
+                    'name' => $user['name'] ?? $post['username'] ?? '',
+                    'username' => $user['username'] ?? $post['username'] ?? '',
+                    'email' => $user['email'] ?? '',
+                ],
+            ];
+        })->all();
 
         return Inertia::render('admin/posts', [
-            'posts' => $posts,
-            'filters' => [
-                'search' => $search,
-                'per_page' => $perPage,
-            ]
+            'posts' => $this->firebase->paginate($posts, $page, $perPage, $search, ['title', 'description', 'username', 'category']),
+            'filters' => ['search' => $search, 'per_page' => $perPage],
         ]);
     }
 
-    /**
-     * Show packages management page
-     */
     public function packages(Request $request)
     {
-        $search = $request->get('search');
-        $perPage = $request->get('per_page', 10);
+        return redirect()->route('admin.settings');
+    }
 
-        $packages = PremiumPackage::query()
-            ->when($search, function ($query, $search) {
-                return $query->where('name', 'like', "%{$search}%")
-                            ->orWhere('description', 'like', "%{$search}%");
-            })
-            ->latest()
-            ->paginate($perPage);
-
-        return Inertia::render('admin/packages', [
-            'packages' => $packages,
-            'filters' => [
-                'search' => $search,
-                'per_page' => $perPage,
-            ]
+    public function settings()
+    {
+        return Inertia::render('admin/settings', [
+            'settings' => $this->firebase->appSettings(),
+            'firebaseConfigured' => $this->firebase->isConfigured(),
         ]);
     }
 
-    /**
-     * Get dashboard statistics API
-     */
     public function getDashboardStats()
     {
-        $stats = [
-            'totalUsers' => User::count(),
-            'totalRecipes' => Recipe::count(),
-            'totalPosts' => Post::count(),
-            'todayUsers' => User::whereDate('created_at', today())->count(),
-            'todayRecipes' => Recipe::whereDate('created_at', today())->count(),
-            'todayPosts' => Post::whereDate('created_at', today())->count(),
-        ];
-
-        return response()->json([
-            'success' => true,
-            'data' => $stats
-        ]);
+        return response()->json(['success' => true, 'data' => $this->firebase->dashboardStats()]);
     }
 
-    /**
-     * Get list of active packages for dropdowns
-     */
     public function getPackagesList()
     {
-        $packages = PremiumPackage::where('is_active', true)->get(['id', 'name']);
-        
-        return response()->json([
-            'success' => true,
-            'data' => $packages
-        ]);
+        return response()->json(['success' => true, 'data' => []]);
     }
 
-    /**
-     * Store a new user
-     * POST /admin/api/users
-     */
+    public function storePackage()
+    {
+        return $this->legacyPackagesDisabled();
+    }
+
+    public function updatePackage()
+    {
+        return $this->legacyPackagesDisabled();
+    }
+
+    public function deletePackage()
+    {
+        return $this->legacyPackagesDisabled();
+    }
+
     public function storeUser(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'username' => 'required|string|max:50|unique:users',
-            'email' => 'required|string|email|max:100|unique:users',
+            'name' => 'nullable|string|max:255',
+            'username' => 'required|string|max:50',
+            'email' => 'required|string|email|max:100',
             'password' => 'required|string|min:6',
             'role' => 'required|in:user,admin',
             'height' => 'nullable|numeric|min:0',
             'weight' => 'nullable|numeric|min:0',
             'age' => 'nullable|integer|min:0|max:150',
             'is_premium' => 'boolean',
-            'premium_package_id' => 'nullable|exists:premium_packages,id',
             'premium_until' => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'username' => $request->username,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'height' => $request->height,
-            'weight' => $request->weight,
-            'age' => $request->age,
-            'is_premium' => $request->is_premium ?? false,
-            'premium_package_id' => $request->premium_package_id,
-            'premium_until' => $request->premium_until,
-        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'User created successfully',
-            'data' => $user
+            'data' => $this->firebase->createUser($validator->validated()),
         ], 201);
     }
 
-    /**
-     * Update an existing user
-     * PUT /admin/api/users/{id}
-     */
-    public function updateUser(Request $request, $id)
+    public function updateUser(Request $request, string $id)
     {
-        $user = User::find($id);
-
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
-        }
-
         $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'username' => 'sometimes|string|max:50|unique:users,username,' . $id,
-            'email' => 'sometimes|string|email|max:100|unique:users,email,' . $id,
-            'password' => 'sometimes|string|min:6',
+            'name' => 'sometimes|nullable|string|max:255',
+            'username' => 'sometimes|string|max:50',
+            'email' => 'sometimes|string|email|max:100',
+            'password' => 'sometimes|nullable|string|min:6',
             'role' => 'sometimes|in:user,admin',
             'height' => 'sometimes|nullable|numeric|min:0',
             'weight' => 'sometimes|nullable|numeric|min:0',
             'age' => 'sometimes|nullable|integer|min:0|max:150',
             'is_premium' => 'boolean',
-            'premium_package_id' => 'nullable|exists:premium_packages,id',
             'premium_until' => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $updateData = $request->only([
-            'name', 'username', 'email', 'role', 'height', 'weight', 'age',
-            'is_premium', 'premium_package_id', 'premium_until'
-        ]);
-        
-        if ($request->has('password')) {
-            $updateData['password'] = Hash::make($request->password);
-        }
-
-        $user->update($updateData);
 
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
-            'data' => $user->fresh()
+            'data' => $this->firebase->updateUser($id, $validator->validated()),
         ]);
     }
 
-    /**
-     * Delete a user
-     * DELETE /admin/api/users/{id}
-     */
-    public function deleteUser($id)
+    public function deleteUser(string $id)
     {
-        $user = User::find($id);
+        $this->firebase->deleteUser($id);
 
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
-        }
+        return response()->json(['success' => true, 'message' => 'User deleted successfully']);
+    }
 
-        // Delete user and related data will be handled by foreign key constraints
-        $user->delete();
-
+    public function userActivity(string $id)
+    {
         return response()->json([
             'success' => true,
-            'message' => 'User deleted successfully'
+            'data' => [
+                'savedRecipes' => $this->firebase->savedRecipesForUser($id),
+                'likedPosts' => $this->firebase->likedPostsForUser($id),
+            ],
         ]);
     }
 
-    /**
-     * Store a new recipe
-     * POST /admin/api/recipes
-     */
     public function storeRecipe(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'ingredients' => 'required|string',
-            'instructions' => 'required|string',
-            'image_url' => 'nullable|string|max:500',
-            'prep_time' => 'required|integer|min:0',
-            'cook_time' => 'required|integer|min:0',
-            'servings' => 'required|integer|min:1',
-        ]);
+        $validator = Validator::make($request->all(), $this->recipeRules());
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $recipe = Recipe::create($request->all());
 
         return response()->json([
             'success' => true,
             'message' => 'Recipe created successfully',
-            'data' => $recipe
+            'data' => $this->firebase->createRecipe($validator->validated()),
         ], 201);
     }
 
-    /**
-     * Update an existing recipe
-     * PUT /admin/api/recipes/{id}
-     */
-    public function updateRecipe(Request $request, $id)
+    public function updateRecipe(Request $request, string $id)
     {
-        $recipe = Recipe::find($id);
-
-        if (!$recipe) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Recipe not found'
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'ingredients' => 'sometimes|string',
-            'instructions' => 'sometimes|string',
-            'image_url' => 'sometimes|nullable|string|max:500',
-            'prep_time' => 'sometimes|integer|min:0',
-            'cook_time' => 'sometimes|integer|min:0',
-            'servings' => 'sometimes|integer|min:1',
-        ]);
+        $validator = Validator::make($request->all(), $this->recipeRules('sometimes'));
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $recipe->update($request->all());
 
         return response()->json([
             'success' => true,
             'message' => 'Recipe updated successfully',
-            'data' => $recipe->fresh()
+            'data' => $this->firebase->updateRecipe($id, $validator->validated()),
         ]);
     }
 
-    /**
-     * Delete a recipe
-     * DELETE /admin/api/recipes/{id}
-     */
-    public function deleteRecipe($id)
+    public function deleteRecipe(string $id)
     {
-        $recipe = Recipe::find($id);
+        $this->firebase->deleteRecipe($id);
 
-        if (!$recipe) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Recipe not found'
-            ], 404);
-        }
-
-        $recipe->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Recipe deleted successfully'
-        ]);
+        return response()->json(['success' => true, 'message' => 'Recipe deleted successfully']);
     }
 
-    /**
-     * Store a new post
-     * POST /admin/api/posts
-     */
     public function storePost(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'image_url' => 'nullable|string|max:500',
-        ]);
+        $validator = Validator::make($request->all(), $this->postRules());
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $post = Post::create($request->all());
 
         return response()->json([
             'success' => true,
             'message' => 'Post created successfully',
-            'data' => $post->load('user')
+            'data' => $this->firebase->createPost($validator->validated()),
         ], 201);
     }
 
-    /**
-     * Update an existing post
-     * PUT /admin/api/posts/{id}
-     */
-    public function updatePost(Request $request, $id)
+    public function updatePost(Request $request, string $id)
     {
-        $post = Post::find($id);
-
-        if (!$post) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Post not found'
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'title' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'image_url' => 'sometimes|nullable|string|max:500',
-            'status' => 'sometimes|integer|in:0,1',
-        ]);
+        $validator = Validator::make($request->all(), $this->postRules('sometimes'));
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $post->update($request->all());
 
         return response()->json([
             'success' => true,
             'message' => 'Post updated successfully',
-            'data' => $post->load('user')
+            'data' => $this->firebase->updatePost($id, $validator->validated()),
         ]);
     }
 
-    /**
-     * Delete a post
-     * DELETE /admin/api/posts/{id}
-     */
-    public function deletePost($id)
+    public function deletePost(string $id)
     {
-        $post = Post::find($id);
+        $this->firebase->deletePost($id);
 
-        if (!$post) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Post not found'
-            ], 404);
-        }
-
-        $post->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Post deleted successfully'
-        ]);
+        return response()->json(['success' => true, 'message' => 'Post deleted successfully']);
     }
 
-    /**
-     * Store a new premium package
-     * POST /admin/api/packages
-     */
-    public function storePackage(Request $request)
+    public function updateSettings(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:premium_packages',
-            'price_monthly' => 'required|numeric|min:0',
-            'price_yearly' => 'required|numeric|min:0',
-            'trial_days' => 'required|integer|min:0',
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
+            'adsEnabled' => 'boolean',
+            'bannerAdsEnabled' => 'boolean',
+            'rewardedAdsEnabled' => 'boolean',
+            'admobBannerId' => 'nullable|string|max:255',
+            'admobRewardedId' => 'nullable|string|max:255',
+            'freeDailyLimit' => 'required|integer|min:0|max:1000',
+            'searchRewardCredits' => 'required|integer|min:0|max:1000',
+            'visionRewardCredits' => 'required|integer|min:0|max:1000',
+            'maintenanceMode' => 'boolean',
+            'maintenanceMessage' => 'nullable|string|max:1000',
+            'minimumSupportedVersion' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return $this->validationError($validator);
         }
-
-        $package = PremiumPackage::create($request->all());
 
         return response()->json([
             'success' => true,
-            'message' => 'Paket başarıyla oluşturuldu',
-            'data' => $package
-        ], 201);
+            'message' => 'Settings updated successfully',
+            'data' => $this->firebase->updateAppSettings($validator->validated()),
+        ]);
     }
 
-    /**
-     * Update an existing premium package
-     * PUT /admin/api/packages/{id}
-     */
-    public function updatePackage(Request $request, $id)
+    private function recipeRules(string $required = 'required'): array
     {
-        $package = PremiumPackage::find($id);
-
-        if (!$package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket bulunamadı'
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255|unique:premium_packages,name,' . $id,
-            'price_monthly' => 'sometimes|numeric|min:0',
-            'price_yearly' => 'sometimes|numeric|min:0',
-            'trial_days' => 'sometimes|integer|min:0',
+        return [
+            'name' => "{$required}|string|max:255",
             'description' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $package->update($request->all());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Paket başarıyla güncellendi',
-            'data' => $package
-        ]);
+            'ingredients' => "{$required}|string",
+            'instructions' => "{$required}|string",
+            'image_url' => 'nullable|string|max:1000',
+            'prep_time' => 'nullable',
+            'cook_time' => 'nullable',
+            'servings' => 'nullable',
+            'difficulty' => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100',
+            'language' => 'nullable|string|max:10',
+            'image_keyword_en' => 'nullable|string|max:255',
+            'calories' => 'nullable|numeric|min:0',
+            'protein' => 'nullable|numeric|min:0',
+            'fat' => 'nullable|numeric|min:0',
+            'carbohydrates' => 'nullable|numeric|min:0',
+            'unsplash_id' => 'nullable|string',
+            'unsplash_photographer' => 'nullable|string',
+            'unsplash_photographer_url' => 'nullable|string',
+            'unsplash_photo_url' => 'nullable|string',
+            'unsplash_download_url' => 'nullable|string',
+            'unsplash_download_location' => 'nullable|string',
+        ];
     }
 
-    /**
-     * Delete a premium package
-     * DELETE /admin/api/packages/{id}
-     */
-    public function deletePackage($id)
+    private function postRules(string $required = 'required'): array
     {
-        $package = PremiumPackage::find($id);
+        return [
+            'userId' => "{$required}|string",
+            'username' => 'nullable|string|max:255',
+            'title' => "{$required}|string|max:255",
+            'description' => 'nullable|string',
+            'imageUrl' => 'nullable|string|max:1000',
+            'category' => 'nullable|string|max:100',
+            'difficulty' => 'nullable|string|max:100',
+            'ingredients' => 'nullable|string',
+            'steps' => 'nullable|string',
+            'likesCount' => 'nullable|integer|min:0',
+            'status' => 'sometimes|boolean',
+        ];
+    }
 
-        if (!$package) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Paket bulunamadı'
-            ], 404);
-        }
-
-        // Check if package is used by any user
-        if ($package->users()->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bu paketi kullanan kullanıcılar var, silinemez. Pasife almayı deneyin.'
-            ], 400);
-        }
-
-        $package->delete();
-
+    private function validationError($validator)
+    {
         return response()->json([
-            'success' => true,
-            'message' => 'Paket başarıyla silindi'
-        ]);
+            'success' => false,
+            'message' => 'Validation error',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    private function legacyPackagesDisabled()
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Premium packages are now managed by RevenueCat and mobile settings.',
+        ], 410);
     }
 }

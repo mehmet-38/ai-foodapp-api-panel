@@ -13,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import { Link, usePage } from '@inertiajs/react';
 import type { MenuProps } from 'antd';
-import { User } from '@/types';
+import { SharedData, User } from '@/types';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -27,7 +27,7 @@ type MenuItem = Required<MenuProps>['items'][number];
 
 export default function AdminLayout({ children, title = 'Admin Panel' }: AdminLayoutProps) {
     const [collapsed, setCollapsed] = useState(false);
-    const { props } = usePage();
+    const { props } = usePage<SharedData>();
     const user = props.auth?.user as User;
     
     const {
@@ -55,6 +55,11 @@ export default function AdminLayout({ children, title = 'Admin Panel' }: AdminLa
             key: 'posts',
             icon: <FileTextOutlined />,
             label: <Link href="/admin/posts">Paylaşımlar</Link>,
+        },
+        {
+            key: 'settings',
+            icon: <SettingOutlined />,
+            label: <Link href="/admin/settings">Mobil Ayarlar</Link>,
         },
     ];
 

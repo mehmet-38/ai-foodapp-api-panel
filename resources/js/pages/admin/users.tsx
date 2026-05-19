@@ -20,7 +20,8 @@ const { Search } = Input;
 const { Title, Text } = Typography;
 
 interface User {
-    id: number;
+    id: string;
+    uid?: string;
     name: string;
     username: string;
     email: string;
@@ -32,7 +33,7 @@ interface User {
     email_verified_at?: string;
     is_premium: boolean;
     premium_until?: string;
-    premium_package_id?: number;
+    premium_package_id?: string;
     premium_package?: {
         id: number;
         name: string;
@@ -61,6 +62,7 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
     const [createModalVisible, setCreateModalVisible] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [packages, setPackages] = useState<{ id: number, name: string }[]>([]);
+    const [activity, setActivity] = useState<{ savedRecipes: any[]; likedPosts: any[] }>({ savedRecipes: [], likedPosts: [] });
     const [form] = Form.useForm();
 
     useEffect(() => {
@@ -107,6 +109,11 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
     const showUserDetails = (user: User) => {
         setSelectedUser(user);
         setModalVisible(true);
+        axios.get(`/admin/api/users/${user.id}/activity`)
+            .then((response) => {
+                if (response.data.success) setActivity(response.data.data);
+            })
+            .catch(() => setActivity({ savedRecipes: [], likedPosts: [] }));
     };
 
     const handleCreateUser = () => {
@@ -476,6 +483,17 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
                             <div>
                                 <Text strong>Kilo:</Text><br />
                                 <Text>{selectedUser.weight ? `${selectedUser.weight} kg` : '-'}</Text>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
+                            <div>
+                                <Text strong>Kaydedilen Tarif:</Text><br />
+                                <Text>{activity.savedRecipes.length}</Text>
+                            </div>
+                            <div>
+                                <Text strong>Beğenilen Post:</Text><br />
+                                <Text>{activity.likedPosts.length}</Text>
                             </div>
                         </div>
                     </div>

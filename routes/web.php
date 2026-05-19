@@ -19,6 +19,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('/recipes', [AdminController::class, 'recipes'])->name('recipes');
     Route::get('/posts', [AdminController::class, 'posts'])->name('posts');
     Route::get('/packages', [AdminController::class, 'packages'])->name('packages');
+    Route::get('/settings', [AdminController::class, 'settings'])->name('settings');
     
     // Admin API endpoints
     Route::get('/api/stats', [AdminController::class, 'getDashboardStats'])->name('api.stats');
@@ -27,6 +28,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::post('/api/users', [AdminController::class, 'storeUser'])->name('api.users.store');
     Route::put('/api/users/{id}', [AdminController::class, 'updateUser'])->name('api.users.update');
     Route::delete('/api/users/{id}', [AdminController::class, 'deleteUser'])->name('api.users.delete');
+    Route::get('/api/users/{id}/activity', [AdminController::class, 'userActivity'])->name('api.users.activity');
     
     // Recipe management API endpoints
     Route::post('/api/recipes', [AdminController::class, 'storeRecipe'])->name('api.recipes.store');
@@ -43,6 +45,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::post('/api/packages', [AdminController::class, 'storePackage'])->name('api.packages.store');
     Route::put('/api/packages/{id}', [AdminController::class, 'updatePackage'])->name('api.packages.update');
     Route::delete('/api/packages/{id}', [AdminController::class, 'deletePackage'])->name('api.packages.delete');
+
+    // Mobile app settings
+    Route::put('/api/settings/mobile', [AdminController::class, 'updateSettings'])->name('api.settings.mobile.update');
 });
 
 require __DIR__.'/settings.php';

@@ -28,14 +28,14 @@ class RevenueCatController extends Controller
         $type = $event['type'] ?? null;
 
         if (!$userId) {
-             Log::warning('RevenueCat Webhook: No app_user_id found in event', $event);
+             $this->safeLog('warning', 'RevenueCat Webhook: No app_user_id found in event', $event);
              return response()->json(['message' => 'UserId missing'], 200); // Return 200 to acknowledge receipt
         }
 
         $user = User::find($userId);
 
         if (!$user) {
-             Log::warning("RevenueCat Webhook: User not found with ID: $userId");
+             $this->safeLog('warning', "RevenueCat Webhook: User not found with ID: $userId");
              return response()->json(['message' => 'User not found'], 200);
         }
 
@@ -53,7 +53,7 @@ class RevenueCatController extends Controller
                         'is_premium' => true,
                         'premium_until' => $expiryDate
                     ]);
-                    Log::info("RevenueCat: User $userId premium activated/renewed until $expiryDate");
+                    $this->safeLog('info', "RevenueCat: User $userId premium activated/renewed until $expiryDate");
                     break;
 
                 case 'EXPIRATION':
@@ -68,23 +68,32 @@ class RevenueCatController extends Controller
                             'is_premium' => false,
                             'premium_until' => null // or keep history
                         ]);
-                        Log::info("RevenueCat: User $userId premium expired");
+                        $this->safeLog('info', "RevenueCat: User $userId premium expired");
                     }
                     break;
                 
                 case 'TEST':
-                    Log::info("RevenueCat: Test event received for User $userId");
+                    $this->safeLog('info', "RevenueCat: Test event received for User $userId");
                     break;
 
                 default:
-                    Log::info("RevenueCat: Unhandled event type $type for User $userId");
+                    $this->safeLog('info', "RevenueCat: Unhandled event type $type for User $userId");
                     break;
             }
         } catch (\Exception $e) {
-            Log::error("RevenueCat Webhook Error: " . $e->getMessage());
+            $this->safeLog('error', "RevenueCat Webhook Error: " . $e->getMessage());
             return response()->json(['message' => 'Server Error'], 500);
         }
 
         return response()->json(['message' => 'OK']);
+    }
+
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::{$level}($message, $context);
+        } catch (\Throwable) {
+            // Logging must not break webhook acknowledgement.
+        }
     }
 }
