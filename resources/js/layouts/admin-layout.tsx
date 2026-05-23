@@ -10,6 +10,7 @@ import {
     MenuUnfoldOutlined,
     SettingOutlined,
     BookOutlined,
+    ApiOutlined,
 } from '@ant-design/icons';
 import { Link, usePage } from '@inertiajs/react';
 import type { MenuProps } from 'antd';
@@ -29,6 +30,7 @@ export default function AdminLayout({ children, title = 'Admin Panel' }: AdminLa
     const [collapsed, setCollapsed] = useState(false);
     const { props } = usePage<SharedData>();
     const user = props.auth?.user as User;
+    const path = typeof window !== 'undefined' ? window.location.pathname : '/admin/dashboard';
     
     const {
         token: { colorBgContainer, borderRadiusLG },
@@ -60,6 +62,11 @@ export default function AdminLayout({ children, title = 'Admin Panel' }: AdminLa
             key: 'settings',
             icon: <SettingOutlined />,
             label: <Link href="/admin/settings">Mobil Ayarlar</Link>,
+        },
+        {
+            key: 'integrations',
+            icon: <ApiOutlined />,
+            label: <Link href="/admin/integrations">Servis Kullanimi</Link>,
         },
     ];
 
@@ -96,7 +103,7 @@ export default function AdminLayout({ children, title = 'Admin Panel' }: AdminLa
                 <Menu
                     theme="light"
                     mode="inline"
-                    defaultSelectedKeys={['dashboard']}
+                    selectedKeys={[path.split('/')[2] || 'dashboard']}
                     items={menuItems}
                 />
             </Sider>

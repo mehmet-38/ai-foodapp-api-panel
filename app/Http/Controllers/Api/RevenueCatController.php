@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Firebase\FirebaseService;
 use Illuminate\Http\Request;
-use App\Models\User;
 use Illuminate\Support\Facades\Log;
+use Kreait\Firebase\Exception\Auth\UserNotFound;
 
 class RevenueCatController extends Controller
 {
+    public function __construct(private readonly FirebaseService $firebase)
+    {
+    }
+
     public function handleWebhook(Request $request)
     {
         // 1. Security Check
@@ -32,9 +37,13 @@ class RevenueCatController extends Controller
              return response()->json(['message' => 'UserId missing'], 200); // Return 200 to acknowledge receipt
         }
 
-        $user = User::find($userId);
+        try {
+            $user = $this->firebase->getUser($userId);
+        } catch (UserNotFound) {
+            $user = null;
+        }
 
-        if (!$user) {
+        if (! $user) {
              $this->safeLog('warning', "RevenueCat Webhook: User not found with ID: $userId");
              return response()->json(['message' => 'User not found'], 200);
         }
@@ -49,7 +58,7 @@ class RevenueCatController extends Controller
                         ? date('Y-m-d H:i:s', $event['expiration_at_ms'] / 1000) 
                         : null;
                     
-                    $user->update([
+                    $this->firebase->updateUser($userId, [
                         'is_premium' => true,
                         'premium_until' => $expiryDate
                     ]);
@@ -64,7 +73,7 @@ class RevenueCatController extends Controller
                     // If CANCELLATION means "refunded" or "revoked" immediately, then setting false is correct.
                     // For now keeping simple: if expired, remove premium.
                     if ($type === 'EXPIRATION') {
-                        $user->update([
+                        $this->firebase->updateUser($userId, [
                             'is_premium' => false,
                             'premium_until' => null // or keep history
                         ]);

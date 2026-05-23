@@ -3,10 +3,15 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\IntegrationsController;
+use App\Http\Controllers\LegalController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
+
+Route::get('/privacy-policy', [LegalController::class, 'privacyPolicy'])->name('privacy-policy');
+Route::get('/terms-of-service', [LegalController::class, 'termsOfService'])->name('terms-of-service');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
@@ -20,9 +25,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('/posts', [AdminController::class, 'posts'])->name('posts');
     Route::get('/packages', [AdminController::class, 'packages'])->name('packages');
     Route::get('/settings', [AdminController::class, 'settings'])->name('settings');
+    Route::get('/integrations', [IntegrationsController::class, 'index'])->name('integrations');
     
     // Admin API endpoints
     Route::get('/api/stats', [AdminController::class, 'getDashboardStats'])->name('api.stats');
+    Route::get('/api/integrations/overview', [IntegrationsController::class, 'overview'])->name('api.integrations.overview');
+    Route::get('/api/integrations/revenuecat/customer', [IntegrationsController::class, 'revenueCatCustomer'])->name('api.integrations.revenuecat.customer');
     
     // User management API endpoints
     Route::post('/api/users', [AdminController::class, 'storeUser'])->name('api.users.store');
