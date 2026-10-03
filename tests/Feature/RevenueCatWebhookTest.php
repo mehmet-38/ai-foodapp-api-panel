@@ -32,7 +32,7 @@ class RevenueCatWebhookTest extends TestCase
                 ->once()
                 ->with($userId, Mockery::on(fn (array $data) => $data === [
                     'is_premium' => true,
-                    'premium_until' => '2025-01-01 00:00:00',
+                    'premium_until' => '2025-01-01 03:00:00',
                 ]))
                 ->andReturn(['uid' => $userId, 'isPremium' => true]);
         });

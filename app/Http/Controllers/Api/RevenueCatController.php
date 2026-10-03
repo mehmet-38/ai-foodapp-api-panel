@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Firebase\FirebaseService;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Exception\Auth\UserNotFound;
@@ -55,7 +56,9 @@ class RevenueCatController extends Controller
                 case 'RENEWAL':
                 case 'NON_RENEWING_PURCHASE':
                     $expiryDate = isset($event['expiration_at_ms']) 
-                        ? date('Y-m-d H:i:s', $event['expiration_at_ms'] / 1000) 
+                        ? Carbon::createFromTimestampMs((int) $event['expiration_at_ms'])
+                            ->timezone('Europe/Istanbul')
+                            ->format('Y-m-d H:i:s')
                         : null;
                     
                     $this->firebase->updateUser($userId, [

@@ -11,6 +11,7 @@ import {
     SettingOutlined,
     BookOutlined,
     ApiOutlined,
+    BellOutlined,
 } from '@ant-design/icons';
 import { Link, usePage } from '@inertiajs/react';
 import type { MenuProps } from 'antd';
@@ -62,6 +63,11 @@ export default function AdminLayout({ children, title = 'Admin Panel' }: AdminLa
             key: 'settings',
             icon: <SettingOutlined />,
             label: <Link href="/admin/settings">Mobil Ayarlar</Link>,
+        },
+        {
+            key: 'push-notifications',
+            icon: <BellOutlined />,
+            label: <Link href="/admin/push-notifications">Push Bildirim</Link>,
         },
         {
             key: 'integrations',

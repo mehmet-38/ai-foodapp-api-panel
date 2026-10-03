@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Input, Button, Tag, Avatar, Space, Card, Typography, Modal, Form, InputNumber, Select, message, Popconfirm, Switch, DatePicker, Row, Col } from 'antd';
+import { Table, Input, Button, Tag, Avatar, Space, Card, Typography, Modal, Form, InputNumber, Select, message, Popconfirm, Switch, DatePicker, Row, Col, Tooltip, Image } from 'antd';
 import {
     UserOutlined,
     SearchOutlined,
@@ -18,6 +18,50 @@ import axios from 'axios';
 
 const { Search } = Input;
 const { Title, Text } = Typography;
+
+// Same convention as admin/recipes.tsx and admin/posts.tsx for resolving stored image paths.
+const getImageUrl = (imagePath: string | null | undefined): string | null => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+    if (imagePath.startsWith('/api/images/')) return `https://foodapp.forthback.com${imagePath}`;
+    return `https://foodapp.forthback.com/api/images/${imagePath}`;
+};
+
+// Mirrors src/constants/dietaryPreferences.js on the mobile app.
+const DIET_TYPE_LABELS: Record<string, string> = {
+    none: 'Kısıtlama Yok',
+    vegetarian: 'Vejetaryen',
+    vegan: 'Vegan',
+    pescatarian: 'Pesketaryen',
+    keto: 'Ketojenik',
+    lowCarb: 'Düşük Karbonhidrat',
+};
+
+const ALLERGY_LABELS: Record<string, string> = {
+    gluten: 'Gluten',
+    lactose: 'Laktoz',
+    nuts: 'Kuruyemiş',
+    egg: 'Yumurta',
+    seafood: 'Deniz Ürünleri',
+    soy: 'Soya',
+};
+
+interface SavedRecipe {
+    id: string;
+    savedAt: string | null;
+    name: string;
+    image_url: string | null;
+    category: string | null;
+    recipeExists: boolean;
+}
+
+interface DietProfile {
+    dietType: string;
+    allergies: string[];
+    age?: number | null;
+    heightCm?: number | null;
+    weightKg?: number | null;
+}
 
 interface User {
     id: string;
@@ -38,6 +82,7 @@ interface User {
         id: number;
         name: string;
     };
+    dietProfile?: DietProfile | null;
 }
 
 interface UsersPageProps {
@@ -62,7 +107,7 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
     const [createModalVisible, setCreateModalVisible] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [packages, setPackages] = useState<{ id: number, name: string }[]>([]);
-    const [activity, setActivity] = useState<{ savedRecipes: any[]; likedPosts: any[] }>({ savedRecipes: [], likedPosts: [] });
+    const [activity, setActivity] = useState<{ savedRecipes: SavedRecipe[]; likedPosts: any[] }>({ savedRecipes: [], likedPosts: [] });
     const [form] = Form.useForm();
 
     useEffect(() => {
@@ -286,6 +331,30 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
             ),
         },
         {
+            title: 'Diyet Profili',
+            key: 'dietProfile',
+            width: 200,
+            render: (_, record) => {
+                const profile = record.dietProfile;
+                if (!profile || (profile.dietType === 'none' && profile.allergies.length === 0)) {
+                    return <Text type="secondary">-</Text>;
+                }
+
+                return (
+                    <Space size={[4, 4]} wrap>
+                        {profile.dietType !== 'none' && (
+                            <Tag color="green">{DIET_TYPE_LABELS[profile.dietType] || profile.dietType}</Tag>
+                        )}
+                        {profile.allergies.length > 0 && (
+                            <Tooltip title={profile.allergies.map((id) => ALLERGY_LABELS[id] || id).join(', ')}>
+                                <Tag color="orange">{profile.allergies.length} alerji</Tag>
+                            </Tooltip>
+                        )}
+                    </Space>
+                );
+            },
+        },
+        {
             title: 'İşlemler',
             key: 'actions',
             width: 120,
@@ -486,14 +555,55 @@ export default function UsersPage({ users, filters }: UsersPageProps) {
                             </div>
                         </div>
 
-                        <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
-                            <div>
-                                <Text strong>Kaydedilen Tarif:</Text><br />
-                                <Text>{activity.savedRecipes.length}</Text>
+                        {selectedUser.dietProfile && (selectedUser.dietProfile.dietType !== 'none' || selectedUser.dietProfile.allergies.length > 0) && (
+                            <div className="mt-4 pt-4 border-t">
+                                <Text strong>Diyet Profili (Onboarding):</Text>
+                                <div className="mt-2 flex flex-wrap gap-2 items-center">
+                                    {selectedUser.dietProfile.dietType !== 'none' && (
+                                        <Tag color="green">{DIET_TYPE_LABELS[selectedUser.dietProfile.dietType] || selectedUser.dietProfile.dietType}</Tag>
+                                    )}
+                                    {selectedUser.dietProfile.allergies.map((id) => (
+                                        <Tag color="orange" key={id}>{ALLERGY_LABELS[id] || id}</Tag>
+                                    ))}
+                                </div>
                             </div>
-                            <div>
-                                <Text strong>Beğenilen Post:</Text><br />
-                                <Text>{activity.likedPosts.length}</Text>
+                        )}
+
+                        <div className="mt-4 pt-4 border-t">
+                            <Text strong>Beğenilen Post:</Text> <Text>{activity.likedPosts.length}</Text>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t">
+                            <Text strong>Kaydedilen Tarifler ({activity.savedRecipes.length}):</Text>
+                            <div className="mt-2 space-y-2" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                                {activity.savedRecipes.length === 0 ? (
+                                    <Text type="secondary">Henüz kaydedilmiş tarif yok.</Text>
+                                ) : (
+                                    activity.savedRecipes.map((recipe) => (
+                                        <div key={recipe.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded">
+                                            {recipe.image_url ? (
+                                                <Image
+                                                    src={getImageUrl(recipe.image_url) || ''}
+                                                    width={36}
+                                                    height={36}
+                                                    preview={false}
+                                                    style={{ objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                                                />
+                                            ) : (
+                                                <div className="w-9 h-9 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs flex-shrink-0">-</div>
+                                            )}
+                                            <div className="flex-1">
+                                                <Text>{recipe.name || 'İsimsiz tarif'}</Text>
+                                                {!recipe.recipeExists && <Tag color="red" className="ml-2">Silinmiş</Tag>}
+                                            </div>
+                                            {recipe.savedAt && (
+                                                <Text type="secondary" className="text-xs">
+                                                    {dayjs(recipe.savedAt).format('DD.MM.YYYY')}
+                                                </Text>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
                     </div>

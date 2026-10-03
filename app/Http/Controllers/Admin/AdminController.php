@@ -50,11 +50,31 @@ class AdminController extends Controller
         $search = $request->get('search');
         $perPage = (int) $request->get('per_page', 10);
         $page = (int) $request->get('page', 1);
-        $recipes = collect($this->firebase->listRecipes())->map(fn (array $recipe) => [
-            ...$recipe,
-            'created_at' => $recipe['createdAt'] ?? $recipe['created_at'] ?? null,
-            'image_url' => $recipe['image_url'] ?? $recipe['imageUrl'] ?? null,
-        ])->all();
+
+        $saversByRecipe = $this->firebase->recipeSaversMap();
+        $usersById = collect($this->firebase->listUsers())->keyBy('uid');
+
+        $recipes = collect($this->firebase->listRecipes())->map(function (array $recipe) use ($saversByRecipe, $usersById) {
+            $savedBy = collect(array_unique($saversByRecipe[$recipe['id']] ?? []))
+                ->map(function (string $uid) use ($usersById) {
+                    $user = $usersById->get($uid);
+
+                    return [
+                        'uid' => $uid,
+                        'username' => $user['username'] ?? $user['name'] ?? $uid,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return [
+                ...$recipe,
+                'created_at' => $recipe['createdAt'] ?? $recipe['created_at'] ?? null,
+                'image_url' => $recipe['image_url'] ?? $recipe['imageUrl'] ?? null,
+                'saved_by' => $savedBy,
+                'saved_count' => count($savedBy),
+            ];
+        })->all();
 
         return Inertia::render('admin/recipes', [
             'recipes' => $this->firebase->paginate(
@@ -290,12 +310,27 @@ class AdminController extends Controller
             'rewardedAdsEnabled' => 'boolean',
             'admobBannerId' => 'nullable|string|max:255',
             'admobRewardedId' => 'nullable|string|max:255',
+            'admobBannerIdIOS' => 'nullable|string|max:255',
+            'admobRewardedIdIOS' => 'nullable|string|max:255',
+            'admobInterstitialIdIOS' => 'nullable|string|max:255',
+            'recipeDetailBannerEnabled' => 'boolean',
+            'savedListBannerEnabled' => 'boolean',
+            'interstitialAdsEnabled' => 'boolean',
+            'interstitialSearchFrequency' => 'required|integer|min:1|max:100',
+            'admobInterstitialId' => 'nullable|string|max:255',
             'freeDailyLimit' => 'required|integer|min:0|max:1000',
             'searchRewardCredits' => 'required|integer|min:0|max:1000',
             'visionRewardCredits' => 'required|integer|min:0|max:1000',
+            'premiumFairUseDailyLimit' => 'required|integer|min:0|max:100000',
+            'dailyPostLimit' => 'required|integer|min:0|max:1000',
             'maintenanceMode' => 'boolean',
             'maintenanceMessage' => 'nullable|string|max:1000',
             'minimumSupportedVersion' => 'nullable|string|max:50',
+            'streakMilestones' => 'required|array|min:1',
+            'streakMilestones.*' => 'integer|min:1|max:3650',
+            'dailyReminderHour' => 'required|integer|min:0|max:23',
+            'dailyReminderMinute' => 'required|integer|min:0|max:59',
+            'streakRiskHour' => 'required|integer|min:0|max:23',
         ]);
 
         if ($validator->fails()) {

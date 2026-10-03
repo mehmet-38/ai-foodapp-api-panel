@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Input, Button, Tag, Space, Card, Typography, Modal, Image, Form, InputNumber, message, Popconfirm } from 'antd';
+import { Table, Input, Button, Tag, Space, Card, Typography, Modal, Image, Form, InputNumber, message, Popconfirm, Popover } from 'antd';
 import {
     SearchOutlined,
     EyeOutlined,
@@ -54,6 +54,8 @@ interface Recipe {
     protein?: number;
     carbohydrates?: number;
     fat?: number;
+    saved_by: { uid: string; username: string }[];
+    saved_count: number;
 }
 
 interface RecipesPageProps {
@@ -290,6 +292,33 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
             render: (date) => dayjs(date).format('DD.MM.YYYY'),
         },
         {
+            title: 'Kaydeden',
+            key: 'saved_by',
+            width: 130,
+            render: (_, record) => {
+                if (!record.saved_count) {
+                    return <Text type="secondary">-</Text>;
+                }
+
+                return (
+                    <Popover
+                        title={`${record.saved_count} kullanıcı kaydetti`}
+                        content={
+                            <div style={{ maxHeight: 200, overflowY: 'auto', maxWidth: 220 }}>
+                                <Space direction="vertical" size={4}>
+                                    {record.saved_by.map((user) => (
+                                        <Text key={user.uid}>{user.username}</Text>
+                                    ))}
+                                </Space>
+                            </div>
+                        }
+                    >
+                        <Tag color="blue" style={{ cursor: 'pointer' }}>{record.saved_count} kullanıcı</Tag>
+                    </Popover>
+                );
+            },
+        },
+        {
             title: 'İşlemler',
             key: 'actions',
             width: 120,
@@ -461,6 +490,21 @@ export default function RecipesPage({ recipes, filters }: RecipesPageProps) {
                                 Fotoğraf: <a href={selectedRecipe.unsplash_photographer_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{selectedRecipe.unsplash_photographer}</a> (Unsplash)
                             </div>
                         )}
+
+                        <div>
+                            <Text strong>Kaydeden Kullanıcılar ({selectedRecipe.saved_count}):</Text>
+                            <div className="mt-2 p-3 bg-gray-50 rounded">
+                                {selectedRecipe.saved_count === 0 ? (
+                                    <Text type="secondary">Henüz kimse kaydetmemiş.</Text>
+                                ) : (
+                                    <Space size={[4, 4]} wrap>
+                                        {selectedRecipe.saved_by.map((user) => (
+                                            <Tag key={user.uid}>{user.username}</Tag>
+                                        ))}
+                                    </Space>
+                                )}
+                            </div>
+                        </div>
 
                         <div>
                             <Text strong>Malzemeler:</Text>

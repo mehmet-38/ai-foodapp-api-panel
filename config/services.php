@@ -40,6 +40,13 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS'),
         'credentials_json' => env('FIREBASE_CREDENTIALS_JSON'),
         'credentials_base64' => env('FIREBASE_CREDENTIALS_BASE64'),
+        // Used to call Firebase HTTPS Callable Functions (e.g. sendPushNotification) from the
+        // server: we mint a custom token for this admin UID, exchange it for an ID token via the
+        // Identity Toolkit REST API (needs the web_api_key), then call the function with that
+        // token so its context.auth.uid matches an entry in the `admins` Firestore collection.
+        'web_api_key' => env('FIREBASE_WEB_API_KEY'),
+        'admin_uid' => env('FIREBASE_FUNCTIONS_ADMIN_UID'),
+        'functions_region' => env('FIREBASE_FUNCTIONS_REGION', 'us-central1'),
     ],
 
     'revenuecat' => [

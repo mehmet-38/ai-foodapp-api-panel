@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\IntegrationsController;
+use App\Http\Controllers\Admin\PushNotificationController;
 use App\Http\Controllers\LegalController;
 
 Route::get('/', function () {
@@ -26,7 +27,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('/packages', [AdminController::class, 'packages'])->name('packages');
     Route::get('/settings', [AdminController::class, 'settings'])->name('settings');
     Route::get('/integrations', [IntegrationsController::class, 'index'])->name('integrations');
-    
+    Route::get('/push-notifications', [PushNotificationController::class, 'index'])->name('push-notifications');
+
     // Admin API endpoints
     Route::get('/api/stats', [AdminController::class, 'getDashboardStats'])->name('api.stats');
     Route::get('/api/integrations/overview', [IntegrationsController::class, 'overview'])->name('api.integrations.overview');
@@ -56,6 +58,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // Mobile app settings
     Route::put('/api/settings/mobile', [AdminController::class, 'updateSettings'])->name('api.settings.mobile.update');
+
+    // Push notifications
+    Route::post('/api/push-notifications/send', [PushNotificationController::class, 'send'])->name('api.push-notifications.send');
 });
 
 require __DIR__.'/settings.php';

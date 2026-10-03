@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Space, Switch, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Select, Space, Switch, Typography, message } from 'antd';
 import AdminLayout from '@/layouts/admin-layout';
 import { Head } from '@inertiajs/react';
 import axios from 'axios';
@@ -12,12 +12,26 @@ interface MobileSettings {
     rewardedAdsEnabled: boolean;
     admobBannerId: string;
     admobRewardedId: string;
+    admobBannerIdIOS: string;
+    admobRewardedIdIOS: string;
+    admobInterstitialIdIOS: string;
+    recipeDetailBannerEnabled: boolean;
+    savedListBannerEnabled: boolean;
+    interstitialAdsEnabled: boolean;
+    interstitialSearchFrequency: number;
+    admobInterstitialId: string;
     freeDailyLimit: number;
     searchRewardCredits: number;
     visionRewardCredits: number;
+    premiumFairUseDailyLimit: number;
+    dailyPostLimit: number;
     maintenanceMode: boolean;
     maintenanceMessage: string;
     minimumSupportedVersion: string;
+    streakMilestones: number[];
+    dailyReminderHour: number;
+    dailyReminderMinute: number;
+    streakRiskHour: number;
 }
 
 interface SettingsPageProps {
@@ -32,7 +46,14 @@ export default function SettingsPage({ settings, firebaseConfigured }: SettingsP
     const handleSubmit = async (values: MobileSettings) => {
         try {
             setLoading(true);
-            const response = await axios.put('/admin/api/settings/mobile', values, {
+            const payload = {
+                ...values,
+                streakMilestones: (values.streakMilestones || [])
+                    .map((value) => Number(value))
+                    .filter((value) => !Number.isNaN(value))
+                    .sort((a, b) => a - b),
+            };
+            const response = await axios.put('/admin/api/settings/mobile', payload, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
             });
 
@@ -96,12 +117,12 @@ export default function SettingsPage({ settings, firebaseConfigured }: SettingsP
 
                     <Row gutter={16}>
                         <Col xs={24} md={12}>
-                            <Form.Item name="admobBannerId" label="AdMob Banner ID">
+                            <Form.Item name="admobBannerId" label="AdMob Banner ID (Android)">
                                 <Input placeholder="Boşsa app.json veya test ID kullanılır" />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item name="admobRewardedId" label="AdMob Rewarded ID">
+                            <Form.Item name="admobRewardedId" label="AdMob Rewarded ID (Android)">
                                 <Input placeholder="Boşsa app.json veya test ID kullanılır" />
                             </Form.Item>
                         </Col>
@@ -109,17 +130,58 @@ export default function SettingsPage({ settings, firebaseConfigured }: SettingsP
 
                     <Row gutter={16}>
                         <Col xs={24} md={8}>
+                            <Form.Item name="admobBannerIdIOS" label="AdMob Banner ID (iOS)">
+                                <Input placeholder="Boşsa app.json veya test ID kullanılır" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item name="admobRewardedIdIOS" label="AdMob Rewarded ID (iOS)">
+                                <Input placeholder="Boşsa app.json veya test ID kullanılır" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item name="admobInterstitialIdIOS" label="AdMob Interstitial ID (iOS)">
+                                <Input placeholder="Boşsa app.json veya test ID kullanılır" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                        <Col xs={24} md={6}>
                             <Form.Item name="freeDailyLimit" label="Ücretsiz Günlük Limit" rules={[{ required: true }]}>
                                 <InputNumber min={0} style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={8}>
+                        <Col xs={24} md={6}>
                             <Form.Item name="searchRewardCredits" label="Arama Reklam Ödülü" rules={[{ required: true }]}>
                                 <InputNumber min={0} style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={8}>
+                        <Col xs={24} md={6}>
                             <Form.Item name="visionRewardCredits" label="AI Tarama Reklam Ödülü" rules={[{ required: true }]}>
+                                <InputNumber min={0} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item
+                                name="premiumFairUseDailyLimit"
+                                label="Premium Gizli Günlük Tavan"
+                                rules={[{ required: true }]}
+                                tooltip="Premium kullanıcı için görünmez arama+tarama tavanı. Aşılırsa kullanıcıya sadece genel bir hata mesajı gösterilir, 'limit' denmez."
+                            >
+                                <InputNumber min={0} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="dailyPostLimit"
+                                label="Günlük Paylaşım Limiti"
+                                rules={[{ required: true }]}
+                                tooltip="Bir kullanıcının günde topluluğa paylaşabileceği tarif sayısı. Kullanıcıya açıkça gösterilir."
+                            >
                                 <InputNumber min={0} style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
@@ -139,6 +201,94 @@ export default function SettingsPage({ settings, firebaseConfigured }: SettingsP
                         <Col xs={24} md={24}>
                             <Form.Item name="maintenanceMessage" label="Bakım Mesajı">
                                 <Input.TextArea rows={3} placeholder="Mobil uygulamada gösterilecek mesaj" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <div className="mb-4 mt-2">
+                        <Title level={5} className="!mb-1">Reklam Yerleşimleri</Title>
+                        <Text type="secondary">Belirli ekranlardaki reklamları ayrı ayrı aç/kapat; hepsi yine de "Reklamlar" anahtarına bağlıdır.</Text>
+                    </div>
+
+                    <Row gutter={16}>
+                        <Col xs={24} md={8}>
+                            <Form.Item name="recipeDetailBannerEnabled" label="Tarif Detayı Banner" valuePropName="checked">
+                                <Switch checkedChildren="Aktif" unCheckedChildren="Pasif" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item name="savedListBannerEnabled" label="Kayıtlı Liste Banner" valuePropName="checked">
+                                <Switch checkedChildren="Aktif" unCheckedChildren="Pasif" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item name="interstitialAdsEnabled" label="Geçiş (Interstitial) Reklam" valuePropName="checked">
+                                <Switch checkedChildren="Aktif" unCheckedChildren="Pasif" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                            <Form.Item
+                                name="interstitialSearchFrequency"
+                                label="Geçiş Reklam Sıklığı (her N aramada bir)"
+                                rules={[{ required: true }]}
+                            >
+                                <InputNumber min={1} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                            <Form.Item name="admobInterstitialId" label="AdMob Interstitial ID">
+                                <Input placeholder="Boşsa app.json veya test ID kullanılır" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <div className="mb-4 mt-2">
+                        <Title level={5} className="!mb-1">Bildirim ve Seri (Streak) Ayarları</Title>
+                        <Text type="secondary">Günlük hatırlatma bildirimi ve seri kaybı uyarısının saatleri; kilometre taşları başarı bildirimini tetikleyen gün sayıları.</Text>
+                    </div>
+
+                    <Row gutter={16}>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="dailyReminderHour"
+                                label="Günlük Hatırlatma Saati (0-23)"
+                                rules={[{ required: true }]}
+                            >
+                                <InputNumber min={0} max={23} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="dailyReminderMinute"
+                                label="Günlük Hatırlatma Dakikası (0-59)"
+                                rules={[{ required: true }]}
+                            >
+                                <InputNumber min={0} max={59} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="streakRiskHour"
+                                label="Seri Risk Uyarı Saati (0-23)"
+                                rules={[{ required: true }]}
+                            >
+                                <InputNumber min={0} max={23} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                        <Col xs={24}>
+                            <Form.Item
+                                name="streakMilestones"
+                                label="Seri Kilometre Taşları (gün)"
+                                rules={[{ required: true, message: 'En az bir değer girin' }]}
+                                extra="Enter'a basarak veya virgülle ayırarak gün sayıları ekleyin, örn: 3, 7, 14, 30"
+                            >
+                                <Select mode="tags" tokenSeparators={[',', ' ']} placeholder="Örn: 3, 7, 14, 30, 60, 100" />
                             </Form.Item>
                         </Col>
                     </Row>

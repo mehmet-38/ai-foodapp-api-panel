@@ -170,9 +170,27 @@ class FirebaseService
         $this->deleteDocument('users', $uid);
     }
 
+    /**
+     * The savedRecipes subcollection only stores a bookmark {savedAt, recipeName} keyed by the
+     * recipe id — resolve each one against the 'recipes' collection so the admin panel can show
+     * the actual saved recipes (name/image/etc.), not just a count.
+     */
     public function savedRecipesForUser(string $uid): array
     {
-        return $this->listCollection("users/{$uid}/savedRecipes", 100);
+        $bookmarks = $this->listCollection("users/{$uid}/savedRecipes", 100);
+
+        return collect($bookmarks)->map(function (array $bookmark) {
+            $recipe = $this->getDocument('recipes', $bookmark['id']);
+
+            return [
+                'id' => $bookmark['id'],
+                'savedAt' => $bookmark['savedAt'] ?? null,
+                'name' => $recipe['name'] ?? $bookmark['recipeName'] ?? '',
+                'image_url' => $recipe['image_url'] ?? null,
+                'category' => $recipe['category'] ?? null,
+                'recipeExists' => $recipe !== null,
+            ];
+        })->all();
     }
 
     public function likedPostsForUser(string $uid): array
@@ -183,6 +201,36 @@ class FirebaseService
     public function listRecipes(int $limit = 1000): array
     {
         return $this->listCollection('recipes', $limit, 'createdAt');
+    }
+
+    /**
+     * Reverse index of savedRecipes bookmarks: recipeId => [uid, uid, ...]. Runs a single
+     * Firestore collection-group query across every user's savedRecipes subcollection instead of
+     * an N+1 per-recipe lookup, so the admin recipes list can show who saved each recipe.
+     */
+    public function recipeSaversMap(int $limit = 5000): array
+    {
+        if (! $this->isConfigured()) {
+            return [];
+        }
+
+        $documents = $this->database()->collectionGroup('savedRecipes')->limit($limit)->documents();
+
+        $map = [];
+        foreach ($documents as $document) {
+            if (! $document->exists()) {
+                continue;
+            }
+
+            $uid = $document->reference()->parent()->parent()?->id();
+            if (! $uid) {
+                continue;
+            }
+
+            $map[$document->id()][] = $uid;
+        }
+
+        return $map;
     }
 
     public function createRecipe(array $data): array
@@ -245,18 +293,104 @@ class FirebaseService
             'rewardedAdsEnabled' => (bool) ($data['rewardedAdsEnabled'] ?? true),
             'admobBannerId' => (string) ($data['admobBannerId'] ?? ''),
             'admobRewardedId' => (string) ($data['admobRewardedId'] ?? ''),
+            'admobBannerIdIOS' => (string) ($data['admobBannerIdIOS'] ?? ''),
+            'admobRewardedIdIOS' => (string) ($data['admobRewardedIdIOS'] ?? ''),
+            'admobInterstitialIdIOS' => (string) ($data['admobInterstitialIdIOS'] ?? ''),
+            'recipeDetailBannerEnabled' => (bool) ($data['recipeDetailBannerEnabled'] ?? true),
+            'savedListBannerEnabled' => (bool) ($data['savedListBannerEnabled'] ?? true),
+            'interstitialAdsEnabled' => (bool) ($data['interstitialAdsEnabled'] ?? true),
+            'interstitialSearchFrequency' => (int) ($data['interstitialSearchFrequency'] ?? 3),
+            'admobInterstitialId' => (string) ($data['admobInterstitialId'] ?? ''),
             'freeDailyLimit' => (int) ($data['freeDailyLimit'] ?? 5),
             'searchRewardCredits' => (int) ($data['searchRewardCredits'] ?? 1),
             'visionRewardCredits' => (int) ($data['visionRewardCredits'] ?? 1),
+            'premiumFairUseDailyLimit' => (int) ($data['premiumFairUseDailyLimit'] ?? 150),
+            'dailyPostLimit' => (int) ($data['dailyPostLimit'] ?? 3),
             'maintenanceMode' => (bool) ($data['maintenanceMode'] ?? false),
             'maintenanceMessage' => (string) ($data['maintenanceMessage'] ?? ''),
             'minimumSupportedVersion' => (string) ($data['minimumSupportedVersion'] ?? ''),
+            'streakMilestones' => collect($data['streakMilestones'] ?? [3, 7, 14, 30, 60, 100])
+                ->map(fn ($value) => (int) $value)
+                ->values()
+                ->all(),
+            'dailyReminderHour' => (int) ($data['dailyReminderHour'] ?? 18),
+            'dailyReminderMinute' => (int) ($data['dailyReminderMinute'] ?? 0),
+            'streakRiskHour' => (int) ($data['streakRiskHour'] ?? 21),
             'updatedAt' => now()->toIso8601String(),
         ];
 
         $this->setDocument('appSettings', 'mobile', $payload, true);
 
         return $this->appSettings();
+    }
+
+    public function isPushNotificationConfigured(): bool
+    {
+        return $this->isConfigured()
+            && (string) config('services.firebase.web_api_key') !== ''
+            && (string) config('services.firebase.admin_uid') !== '';
+    }
+
+    /**
+     * Calls the sendPushNotification Firebase Callable Function. We authenticate as a fixed admin
+     * UID (must exist in the `admins` Firestore collection) rather than a real end-user session:
+     * mint a custom token for that UID with the Admin SDK, exchange it for an ID token via the
+     * Identity Toolkit REST API, then call the function with that ID token so its
+     * `context.auth.uid` check passes. The ID token is cached just under its 1h lifetime.
+     *
+     * @param array{type: string, topic?: string, uids?: array<int, string>} $target
+     */
+    public function sendPushNotification(string $title, string $body, array $target): array
+    {
+        if (! $this->isPushNotificationConfigured()) {
+            throw new RuntimeException('FIREBASE_WEB_API_KEY / FIREBASE_FUNCTIONS_ADMIN_UID yapılandırılmamış.');
+        }
+
+        $region = (string) config('services.firebase.functions_region', 'us-central1');
+        $url = "https://{$region}-{$this->projectId}.cloudfunctions.net/sendPushNotification";
+
+        $response = Http::withToken($this->functionsCallerIdToken())
+            ->withOptions(['proxy' => ''])
+            ->acceptJson()
+            ->asJson()
+            ->timeout(30)
+            ->post($url, [
+                'data' => [
+                    'title' => $title,
+                    'body' => $body,
+                    'target' => $target,
+                ],
+            ]);
+
+        if ($response->failed()) {
+            $error = $response->json('error');
+            $message = is_array($error) ? ($error['message'] ?? null) : null;
+
+            throw new RuntimeException($message ?? "Bildirim gönderilemedi (HTTP {$response->status()}).");
+        }
+
+        return $response->json('result') ?? [];
+    }
+
+    private function functionsCallerIdToken(): string
+    {
+        $adminUid = (string) config('services.firebase.admin_uid');
+        $webApiKey = (string) config('services.firebase.web_api_key');
+
+        return Cache::remember("firebase_functions_id_token_{$adminUid}", 3300, function () use ($adminUid, $webApiKey) {
+            $customToken = $this->auth()->createCustomToken($adminUid)->toString();
+
+            $response = Http::asJson()
+                ->withOptions(['proxy' => ''])
+                ->post("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key={$webApiKey}", [
+                    'token' => $customToken,
+                    'returnSecureToken' => true,
+                ])
+                ->throw()
+                ->json();
+
+            return $response['idToken'];
+        });
     }
 
     public function paginate(array $items, int $page = 1, int $perPage = 10, ?string $search = null, array $searchFields = []): array
@@ -568,6 +702,7 @@ class FirebaseService
         $email = $authUser instanceof UserRecord ? $authUser->email : ($authUser['email'] ?? null);
         $emailVerified = $authUser instanceof UserRecord ? $authUser->emailVerified : ($authUser['emailVerified'] ?? false);
         $disabled = $authUser instanceof UserRecord ? $authUser->disabled : ($authUser['disabled'] ?? false);
+        $dietProfile = $profile['dietProfile'] ?? null;
 
         return [
             'id' => $uid,
@@ -584,6 +719,13 @@ class FirebaseService
             'height' => $profile['height'] ?? null,
             'weight' => $profile['weight'] ?? null,
             'age' => $profile['age'] ?? null,
+            'dietProfile' => $dietProfile ? [
+                'dietType' => $dietProfile['dietType'] ?? 'none',
+                'allergies' => array_values($dietProfile['allergies'] ?? []),
+                'age' => $dietProfile['age'] ?? null,
+                'heightCm' => $dietProfile['heightCm'] ?? null,
+                'weightKg' => $dietProfile['weightKg'] ?? null,
+            ] : null,
             'created_at' => $createdAt,
             'createdAt' => $createdAt,
             'disabled' => (bool) $disabled,
@@ -607,50 +749,66 @@ class FirebaseService
         ], fn ($value) => $value !== null);
     }
 
+    /**
+     * Only includes a key when it was actually present in $data, so partial updates (e.g. a
+     * status-only toggle) merge cleanly instead of wiping untouched fields back to their defaults.
+     */
     private function recipePayload(array $data): array
     {
-        return array_filter([
-            'name' => $data['name'] ?? null,
-            'description' => $data['description'] ?? '',
-            'ingredients' => $data['ingredients'] ?? '',
-            'instructions' => $data['instructions'] ?? '',
-            'cook_time' => $data['cook_time'] ?? $data['cookTime'] ?? null,
-            'prep_time' => $data['prep_time'] ?? $data['prepTime'] ?? null,
-            'servings' => $data['servings'] ?? null,
-            'difficulty' => $data['difficulty'] ?? '',
-            'category' => $data['category'] ?? '',
-            'image_url' => $data['image_url'] ?? $data['imageUrl'] ?? '',
-            'image_keyword_en' => $data['image_keyword_en'] ?? '',
-            'language' => $data['language'] ?? 'tr',
-            'calories' => isset($data['calories']) ? (int) $data['calories'] : null,
-            'protein' => isset($data['protein']) ? (float) $data['protein'] : null,
-            'fat' => isset($data['fat']) ? (float) $data['fat'] : null,
-            'carbohydrates' => isset($data['carbohydrates']) ? (float) $data['carbohydrates'] : null,
-            'unsplash_id' => $data['unsplash_id'] ?? '',
-            'unsplash_photographer' => $data['unsplash_photographer'] ?? '',
-            'unsplash_photographer_url' => $data['unsplash_photographer_url'] ?? '',
-            'unsplash_photo_url' => $data['unsplash_photo_url'] ?? '',
-            'unsplash_download_url' => $data['unsplash_download_url'] ?? '',
-            'unsplash_download_location' => $data['unsplash_download_location'] ?? '',
-            'userId' => $data['userId'] ?? $data['user_id'] ?? null,
-        ], fn ($value) => $value !== null);
+        $hasAny = fn (array $keys) => collect($keys)->contains(fn ($key) => array_key_exists($key, $data));
+
+        $payload = [];
+
+        if (array_key_exists('name', $data)) $payload['name'] = $data['name'];
+        if (array_key_exists('description', $data)) $payload['description'] = $data['description'] ?? '';
+        if (array_key_exists('ingredients', $data)) $payload['ingredients'] = $data['ingredients'] ?? '';
+        if (array_key_exists('instructions', $data)) $payload['instructions'] = $data['instructions'] ?? '';
+        if ($hasAny(['cook_time', 'cookTime'])) $payload['cook_time'] = $data['cook_time'] ?? $data['cookTime'] ?? null;
+        if ($hasAny(['prep_time', 'prepTime'])) $payload['prep_time'] = $data['prep_time'] ?? $data['prepTime'] ?? null;
+        if (array_key_exists('servings', $data)) $payload['servings'] = $data['servings'];
+        if (array_key_exists('difficulty', $data)) $payload['difficulty'] = $data['difficulty'] ?? '';
+        if (array_key_exists('category', $data)) $payload['category'] = $data['category'] ?? '';
+        if ($hasAny(['image_url', 'imageUrl'])) $payload['image_url'] = $data['image_url'] ?? $data['imageUrl'] ?? '';
+        if (array_key_exists('image_keyword_en', $data)) $payload['image_keyword_en'] = $data['image_keyword_en'] ?? '';
+        if (array_key_exists('language', $data)) $payload['language'] = $data['language'] ?? 'tr';
+        if (array_key_exists('calories', $data)) $payload['calories'] = isset($data['calories']) ? (int) $data['calories'] : null;
+        if (array_key_exists('protein', $data)) $payload['protein'] = isset($data['protein']) ? (float) $data['protein'] : null;
+        if (array_key_exists('fat', $data)) $payload['fat'] = isset($data['fat']) ? (float) $data['fat'] : null;
+        if (array_key_exists('carbohydrates', $data)) $payload['carbohydrates'] = isset($data['carbohydrates']) ? (float) $data['carbohydrates'] : null;
+        if (array_key_exists('unsplash_id', $data)) $payload['unsplash_id'] = $data['unsplash_id'] ?? '';
+        if (array_key_exists('unsplash_photographer', $data)) $payload['unsplash_photographer'] = $data['unsplash_photographer'] ?? '';
+        if (array_key_exists('unsplash_photographer_url', $data)) $payload['unsplash_photographer_url'] = $data['unsplash_photographer_url'] ?? '';
+        if (array_key_exists('unsplash_photo_url', $data)) $payload['unsplash_photo_url'] = $data['unsplash_photo_url'] ?? '';
+        if (array_key_exists('unsplash_download_url', $data)) $payload['unsplash_download_url'] = $data['unsplash_download_url'] ?? '';
+        if (array_key_exists('unsplash_download_location', $data)) $payload['unsplash_download_location'] = $data['unsplash_download_location'] ?? '';
+        if ($hasAny(['userId', 'user_id'])) $payload['userId'] = $data['userId'] ?? $data['user_id'] ?? null;
+
+        return array_filter($payload, fn ($value) => $value !== null);
     }
 
+    /**
+     * Same "only touch what was sent" rule as recipePayload — this is what fixes the admin
+     * status-toggle wiping out imageUrl/description/etc. on a partial {status: 0} update.
+     */
     private function postPayload(array $data): array
     {
-        return array_filter([
-            'title' => $data['title'] ?? null,
-            'description' => $data['description'] ?? '',
-            'category' => $data['category'] ?? '',
-            'difficulty' => $data['difficulty'] ?? '',
-            'ingredients' => $data['ingredients'] ?? '[]',
-            'steps' => $data['steps'] ?? '[]',
-            'imageUrl' => $data['imageUrl'] ?? $data['image_url'] ?? '',
-            'userId' => $data['userId'] ?? $data['user_id'] ?? null,
-            'username' => $data['username'] ?? '',
-            'likesCount' => isset($data['likesCount']) ? (int) $data['likesCount'] : (isset($data['likes_count']) ? (int) $data['likes_count'] : 0),
-            'status' => isset($data['status']) ? (bool) $data['status'] : true,
-        ], fn ($value) => $value !== null);
+        $hasAny = fn (array $keys) => collect($keys)->contains(fn ($key) => array_key_exists($key, $data));
+
+        $payload = [];
+
+        if (array_key_exists('title', $data)) $payload['title'] = $data['title'];
+        if (array_key_exists('description', $data)) $payload['description'] = $data['description'] ?? '';
+        if (array_key_exists('category', $data)) $payload['category'] = $data['category'] ?? '';
+        if (array_key_exists('difficulty', $data)) $payload['difficulty'] = $data['difficulty'] ?? '';
+        if (array_key_exists('ingredients', $data)) $payload['ingredients'] = $data['ingredients'] ?? '[]';
+        if (array_key_exists('steps', $data)) $payload['steps'] = $data['steps'] ?? '[]';
+        if ($hasAny(['imageUrl', 'image_url'])) $payload['imageUrl'] = $data['imageUrl'] ?? $data['image_url'] ?? '';
+        if ($hasAny(['userId', 'user_id'])) $payload['userId'] = $data['userId'] ?? $data['user_id'] ?? null;
+        if (array_key_exists('username', $data)) $payload['username'] = $data['username'] ?? '';
+        if ($hasAny(['likesCount', 'likes_count'])) $payload['likesCount'] = (int) ($data['likesCount'] ?? $data['likes_count'] ?? 0);
+        if (array_key_exists('status', $data)) $payload['status'] = (bool) $data['status'];
+
+        return array_filter($payload, fn ($value) => $value !== null);
     }
 
     private function defaultAppSettings(): array
@@ -661,12 +819,26 @@ class FirebaseService
             'rewardedAdsEnabled' => true,
             'admobBannerId' => '',
             'admobRewardedId' => '',
+            'admobBannerIdIOS' => '',
+            'admobRewardedIdIOS' => '',
+            'admobInterstitialIdIOS' => '',
+            'recipeDetailBannerEnabled' => true,
+            'savedListBannerEnabled' => true,
+            'interstitialAdsEnabled' => true,
+            'interstitialSearchFrequency' => 3,
+            'admobInterstitialId' => '',
             'freeDailyLimit' => 5,
             'searchRewardCredits' => 1,
             'visionRewardCredits' => 1,
+            'premiumFairUseDailyLimit' => 150,
+            'dailyPostLimit' => 3,
             'maintenanceMode' => false,
             'maintenanceMessage' => '',
             'minimumSupportedVersion' => '',
+            'streakMilestones' => [3, 7, 14, 30, 60, 100],
+            'dailyReminderHour' => 18,
+            'dailyReminderMinute' => 0,
+            'streakRiskHour' => 21,
         ];
     }
 
